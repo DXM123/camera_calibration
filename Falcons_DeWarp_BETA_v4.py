@@ -28,21 +28,12 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon, QPixmap, QImage
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QTimer
 
-# https://www.pythontutorial.net/pyqt/pyqt-qmainwindow/
-# https://learnopencv.com/camera-calibration-using-opencv/
-# https://www.youtube.com/watch?v=p1kCR1i2nF0
-
-# Dependency OpenCV 4.x and MatPlotLib
-# TODO Adding matplotlib to draw Field / Better visualization of results -> or other ...
-
 #Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns = 7  #number of columns of your Checkerboard
 no_of_rows = 7  #number of rows of your Checkerboard
-# square_size = 37.0 # size of square on the Checkerboard in mm
 square_size = 27.0 # size of square on the Checkerboard in mm
 min_cap = 3 # minimum or images to be collected by capturing (Default is 10), minimum is 3
 
-#class MyTabsWidget(QWidget):
 class CameraWidget (QWidget):
     # Add a signal for updating the status
     update_status_signal = pyqtSignal(str)
@@ -65,10 +56,6 @@ class CameraWidget (QWidget):
         self.capture_started = False # Track if caputure is started
         self.test_started = False # Track if test is started
         self.cal_imported = False # Track if imported calibration is used
-
-        #Not used: 
-        #self.corner_detection_started = False
-        #self.calibration_started = False
 
         # Need the camera object in this Widget
         self.cap = cv2.VideoCapture(0) # webcam object
@@ -98,9 +85,7 @@ class CameraWidget (QWidget):
         self.tabs.addTab(self.tab1, "Camera Calibration")
         self.tabs.addTab(self.tab2, "Perspective-Warp")
 
-        ####################
-        # Create first tab #
-        ####################
+        # ..::Create first tab::.. #
 
         # Create Horizontal Box Layout for tab 1
         self.tab1.layout = QHBoxLayout(self.tab1)
@@ -121,9 +106,6 @@ class CameraWidget (QWidget):
         self.imageLabel.setFrameShape(QFrame.Box)
         self.tab1inner.layout.addWidget(self.imageLabel)
 
-        # Add tab1inner to tab1
-        #self.tab1.layout.addWidget(self.tab1inner)
-
         # Add Done Button last
         self.doneButton1 = QPushButton("DONE", self.tab1inner)
         self.doneButton1.clicked.connect(self.check_done)
@@ -136,7 +118,6 @@ class CameraWidget (QWidget):
         self.optionsFrame = QWidget()
         self.optionsFrame.layout = QVBoxLayout(self.optionsFrame)
         self.optionsFrame.layout.setAlignment(Qt.AlignTop)  # Align the layout to the top
-        #self.optionsFrame.layout.addStretch(1)
 
         # Set fixed width for optionsFrame
         self.optionsFrame.setFixedWidth(400)
@@ -187,9 +168,7 @@ class CameraWidget (QWidget):
         # Set tab1.layout as the layout for tab1
         self.tab1.setLayout(self.tab1.layout)
 
-        #####################
-        # Create second tab #
-        #####################
+        # ..::Create second tab::.. #
 
         self.tab2.layout = QVBoxLayout(self.tab2)
 
@@ -298,7 +277,6 @@ class CameraWidget (QWidget):
                     print("Self capture is True")
                     # Call detectCorners function
                     ret_corners, corners, frame_with_corners = self.detectCorners(frame_inverted, no_of_columns, no_of_rows)
-                    #print("Countdown is", self.countdown_seconds)
 
                     if ret_corners and self.countdown_seconds > 0:
                         #self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
@@ -340,8 +318,6 @@ class CameraWidget (QWidget):
             self.countdown_timer.start()
 
     def detectCorners(self, image, columns, rows):
-        # Only detect Corners when testing is False
-
         # stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
@@ -373,7 +349,6 @@ class CameraWidget (QWidget):
 
         # Generate a timestamp for the screenshot filename
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
-
         filename = f"output/corner_{timestamp}.png"
 
         # Save the frame as an image
@@ -492,8 +467,6 @@ class CameraWidget (QWidget):
 
             else:
                 print("Camera Calibration failed")
-        #else:
-        #    print("Not enough images found for calibration. Make sure the images are stored in the output folder.")
 
     def generate_object_points(self, columns, rows, square_size):
         # Generate a grid of 3D points representing the corners of the chessboard
@@ -508,17 +481,12 @@ class CameraWidget (QWidget):
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....")
-        
-        # source: https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
 
         # Set test boolean
         self.test_started = True
 
         # Start update_camera_feed again
         self.timer.start(100) # Start camera feed (is based on timer)
-        # self.update_camera_feed()clear
-
-        #print (f"File imported is {self.cal_imported}")
 
         if self.cal_imported == False:
             # Update DONE button to Test Calibration
@@ -550,11 +518,6 @@ class CameraWidget (QWidget):
         # Generate a timestamp for the json parameter filename
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         
-        # Example
-        #camera_matrix=[[ 532.80990646 ,0.0,342.49522219],[0.0,532.93344713,233.88792491],[0.0,0.0,1.0]]
-        #dist_coeff = [-2.81325798e-01,2.91150014e-02,1.21234399e-03,-1.40823665e-04,1.54861424e-01]
-        #data = {"camera_matrix": camera_matrix, "dist_coeff": dist_coeff}
-
         # Convert NumPy arrays to lists
         camera_matrix_list = self.camera_matrix.tolist() if self.camera_matrix is not None else None
         dist_coeff_list = self.camera_dist_coeff.tolist() if self.camera_dist_coeff is not None else None
@@ -572,8 +535,6 @@ class CameraWidget (QWidget):
 
             # Emit the signal with the updated status text
             self.update_status_signal.emit("Calibration file Saved")
-
-            #self.start_dewarp()
             
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
@@ -598,10 +559,6 @@ class CameraWidget (QWidget):
         if file_name:
              # Load the image using QPixmap
             pixmap = QPixmap(file_name)
-
-            # Load the image
-            #pixmap = cv2.imread(file_name)
-
             self.image_label.setPixmap(pixmap)
             self.image_label.setScaledContents(True)
 
@@ -665,8 +622,6 @@ class CamCalMain(QMainWindow):
         # Connect the signal to the slot for updating the status bar
         self.camera_widget.update_status_signal.connect(self.update_status_bar)
 
-        #self.show()
-
     def check_output_empty(self):
         # Check if there are existing images in the output folder
         existing_images = [f for f in os.listdir("./output") if f.startswith("corner_") and f.endswith(".png")]
@@ -724,8 +679,6 @@ class CamCalMain(QMainWindow):
                     # Set tracker to True in camera_widget, needed in test_calibration
                     self.camera_widget.cal_imported = True
 
-                    #############################################################################
-
                     # Update button text
                     self.camera_widget.captureButton1.setText("Capture Finished")
                     # Disable Capture Button when import succeeded
@@ -742,17 +695,11 @@ class CamCalMain(QMainWindow):
                     self.camera_widget.doneButton1.setText("Test Calibration")
                     self.camera_widget.doneButton1.clicked.connect(self.camera_widget.test_calibration) # change connect to calibartion test
 
-                    #############################################################################
-
             except FileNotFoundError:
                 print(f"File {filename} not found.")
-                # Below only available in tab1
-                #self.update_status_signal.emit(f"File not found: {file_name}")
                 self.camera_widget.update_status_signal.emit(f"File not found: {file_name}")
             except Exception as e:
                 print(f"Error loading calibration file: {e}")
-                # Below onlu available in tab1
-                #self.update_status_signal.emit("Error loading calibration file")
                 self.camera_widget.update_status_signal.emit("Error loading calibration file")
 
     def update_status_bar(self, status_text):
