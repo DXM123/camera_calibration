@@ -33,7 +33,7 @@ This Python application provides a user-friendly tool for camera calibration and
   - Display the loaded image.
   - Initiate perspective-warp process.
 
-## How to Use
+## How to Use - Tested on Ubuntu 22.04 LTS
 
 1. Clone the repository:
 
