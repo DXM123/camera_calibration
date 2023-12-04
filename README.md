@@ -40,4 +40,5 @@ This Python application provides a user-friendly tool for camera calibration and
    ```bash
    git clone https://github.com/DXM123/camera_calibration.git
 
-2. Run the script (make executable first)
+2. Make sure opencv is availble
+3. Run the script (make executable first)
