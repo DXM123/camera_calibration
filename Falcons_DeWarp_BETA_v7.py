@@ -53,10 +53,9 @@ class Warper(object):
         self.supersample = supersample
 
         print("Following values used as input for Warper Class: ")
-        print(self.width())  # Access the width attribute of the warper instance
-        print(self.height())  # Access the height attribute of the warper instance
-        print(self.supersample)  # Access the supersample attribute of the warper instance
-        print()
+        print(f"W:{self.width()}")  # Access the width attribute of the warper instance
+        print(f"H:{self.height()}")  # Access the height attribute of the warper instance
+        print(f"SS:{self.supersample}")  # Access the supersample attribute of the warper instance
 
         # Collected points
         self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
@@ -902,6 +901,7 @@ class CameraWidget (QWidget):
 
                     # Update button text
                     self.startButtonPwarp.setText("DONE")
+                    self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> QMessageBox gets triggered again here TODO
 
                     # Disable Capture Button when import succeeded
                     self.loadImage.setDisabled(True)  # LoadImage / load_image confusing
@@ -938,6 +938,8 @@ class CameraWidget (QWidget):
 
             # TODO
 
+    def close_application(self):
+        QApplication.quit()
 
     def dewarp(self, img):
         bgimage = img.copy()
