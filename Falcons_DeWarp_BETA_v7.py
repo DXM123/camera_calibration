@@ -938,8 +938,8 @@ class CameraWidget (QWidget):
             # Print the x, y coordinates
             print(f"Mouse clicked at x: {x}, y: {y}")
 
-            # Check if the pixmap is set on the Camera Frame
-            if self.cameraFrame.pixmap() is not None:
+            # Check if the pixmap is set on the Image Frane
+            if self.imageFrame.pixmap() is not None:
 
                 self.points.append((x, y))
                 self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
