@@ -43,7 +43,7 @@ min_cap = 3 # minimum or images to be collected by capturing (Default is 10), mi
 soccer_field_width = 22
 soccer_field_length = 14
 
-################# DeWarp Classes 
+################# Perspective Warp Classes ################# 
 
 class Warper(object):
     def __init__(self,points,width=229,height=229,supersample=2,interpolation=None):
@@ -102,7 +102,7 @@ class Warper(object):
                 out[:] = cv2.resize(self.dst, (W,H), interpolation=self.interpolation)
                 return out
 
-####################################
+###############################################################
 
 class CameraWidget (QWidget):
     # Add a signal for updating the status
@@ -649,7 +649,7 @@ class CameraWidget (QWidget):
         return objp
     
     def test_calibration(self):
-        # TODO if Pause butotn was pressed , camera is stopped doing testing !!!!
+        # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
 
         # Emit the signal with the updated status text
@@ -855,7 +855,7 @@ class CameraWidget (QWidget):
             print("Starting image de-warp") #-> update status
 
             # Use the loaded image directly
-            pixmap = self.imageFrame.pixmap()
+            # pixmap = self.imageFrame.pixmap()
 
             # image = pixmap.toImage()
             # cv_frame = np.array(image.rgbSwapped())  # Convert to NumPy array
@@ -938,8 +938,8 @@ class CameraWidget (QWidget):
             # Print the x, y coordinates
             print(f"Mouse clicked at x: {x}, y: {y}")
 
-            # Check if the pixmap is set
-            if self.imageFrame.pixmap() is not None:
+            # Check if the pixmap is set on the Camera Frame
+            if self.cameraFrame.pixmap() is not None:
 
                 self.points.append((x, y))
                 self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
