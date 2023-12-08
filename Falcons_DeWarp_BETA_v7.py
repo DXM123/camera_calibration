@@ -901,6 +901,7 @@ class CameraWidget (QWidget):
 
                     # Update button text
                     self.startButtonPwarp.setText("DONE")
+                    self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
                     self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> QMessageBox gets triggered again here TODO
 
                     # Disable Capture Button when import succeeded
