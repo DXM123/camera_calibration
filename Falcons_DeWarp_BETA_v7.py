@@ -36,7 +36,7 @@ from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QTimer
 #Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns = 7  #number of columns of your Checkerboard
 no_of_rows = 7  #number of rows of your Checkerboard
-square_size = 27.0 # size of square on the Checkerboard in mm
+square_size = 27.0 # size of square on the Checkerboard in mm -> This is no longer required?
 min_cap = 3 # minimum or images to be collected by capturing (Default is 10), minimum is 3
 
 # Assuming the soccer field is 22 x 14 meters
@@ -52,7 +52,13 @@ class Warper(object):
         self.height = height
         self.supersample = supersample
 
-        # TODO use the correct landmarks 2,0 6,0 0,2 0,6 
+        print("Following values used as input for Warper Class: ")
+        print(self.width())  # Access the width attribute of the warper instance
+        print(self.height())  # Access the height attribute of the warper instance
+        print(self.supersample)  # Access the supersample attribute of the warper instance
+        print()
+
+        # Collected points
         self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
 
         print("self.pts1:", self.pts1)
@@ -61,9 +67,6 @@ class Warper(object):
         W = self.width()
         H = self.height()
 
-        print(f"Check 1 | W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
-
-        ## TEST
         # Check if W and H are integers or floats
         if not isinstance(W, (int, float)) or not isinstance(H, (int, float)):
             raise ValueError("Width and height should be numerical values.")
@@ -72,9 +75,10 @@ class Warper(object):
         if not isinstance(supersample, (int, float)):
             raise ValueError("Supersample should be a numerical value.")
 
+        # TODO use the correct landmarks 2,0 6,0 0,2 0,6 
         self.pts2 = np.float32([[0,0],[W*supersample,0],[0,H*supersample],[W*supersample,H*supersample]])
 
-        print("self.pts2:", self.pts2) # Now set to outer display coordinates TODO
+        print("self.pts2:", self.pts2)
 
         self.M = cv2.getPerspectiveTransform(self.pts1,self.pts2)
         self.dst = None
@@ -85,13 +89,13 @@ class Warper(object):
 
     def warp(self,img,out=None):
         # Call the height and width method to get the actual value of the frame
-        W = self.width()  # Call the width method to get the actual value
-        H = self.height()  # Call the height method to get the actual value
+        W = self.width()
+        H = self.height()
 
         M = self.M
         supersample = self.supersample
 
-        print(f"Check 2 | W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
+        #print(f"Check | W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
 
         if self.dst is None:
             self.dst = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
@@ -376,7 +380,6 @@ class CameraWidget (QWidget):
         aspect_ratio = soccer_field_width / soccer_field_length
 
         # Set the height of the QLabel to fixed pixels
-        #label_height = 240 # To small when using color
         label_height = 300
 
         # Draw and display soccer field in the ProcessFrame
@@ -452,11 +455,10 @@ class CameraWidget (QWidget):
     def imageToPixmap(self, image):
         qformat = QImage.Format_RGB888
         img = QImage(image, image.shape[1], image.shape[0] , image.strides[0], qformat)
-        # img = img.rgbSwapped()  # BGR > RGB # remove it here for now
-        # print("Pixmap conversion successful")
+        # img = img.rgbSwapped()  # BGR > RGB # not needed
         return QPixmap.fromImage(img)
     
-    # Check def convert_cvimage)to_pixmap / def imageToPixmap (are they the same) -> This one not used now
+    # Check def convert_cvimage)to_pixmap / def imageToPixmap (are they the same)
     #def convert_cvimage_to_pixmap(self, image):
     #    height, width, channel = image.shape
     #    bytesPerLine = 3 * width
@@ -880,18 +882,21 @@ class CameraWidget (QWidget):
             if isinstance(frame, np.ndarray):
                 if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
 
-                    #self.dewarp(frame) # return warper
                     self.warper_result = self.dewarp(frame) # return warper
 
-                    #original_inverted_frame = frame_inverted.copy()  # Store the original frame
+                    # Apply camera correction if any set
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                    dewarped_frame = self.warper_result.warp(undistorted_frame.copy())  # Perform dewarping
+
+                    # Perform dewarping
+                    dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
 
                     # Update the display with the dewarped image
                     self.display_dewarped_image(dewarped_frame)
-    
+
                     # Emit the signal with the updated status text
                     QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
+
+                    # Print stuff and update status bar
                     print("Dewarping process completed.")
                     self.update_status_signal.emit("Dewarping process completed.")
 
@@ -937,6 +942,7 @@ class CameraWidget (QWidget):
     def dewarp(self, img):
         bgimage = img.copy()
         self.display_image(bgimage)
+
         self.imageFrame.mousePressEvent = self.mouse_click_event
 
         while True:
@@ -944,7 +950,12 @@ class CameraWidget (QWidget):
                 break
             QApplication.processEvents()
 
-        warper = Warper(points=self.points, width=self.width, height=self.height, supersample=self.supersample)
+        print(f"Check 1 self | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
+        print(f"Check 1 cameraFrame| W: {self.cameraFrame.width()}, H: {self.cameraFrame.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
+
+        # TODO set correct height and width here
+        # warper = Warper(points=self.points, width=self.width, height=self.height, supersample=self.supersample)
+        warper = Warper(points=self.points, width=self.cameraFrame.width, height=self.cameraFrame.height, supersample=self.supersample)
 
         return warper
 
