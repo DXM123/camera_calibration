@@ -187,17 +187,17 @@ class CameraWidget (QWidget):
         self.tab1inner.layout.addWidget(self.captureButton1)
 
         # Add Camera Frame
-        self.imageLabel = QLabel("Image will be displayed here", self.tab1inner)
+        self.cameraFrame = QLabel("Image will be displayed here", self.tab1inner)
 
         # Set word wrap to ensure text fits within the QLabel width
-        self.imageLabel.setWordWrap(True)
+        self.cameraFrame.setWordWrap(True)
 
         # Set alignment to center the text within the QLabel
-        self.imageLabel.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+        self.cameraFrame.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
 
-        self.imageLabel.resize(640, 480)
-        self.imageLabel.setFrameShape(QFrame.Box)
-        self.tab1inner.layout.addWidget(self.imageLabel)
+        self.cameraFrame.resize(640, 480)
+        self.cameraFrame.setFrameShape(QFrame.Box)
+        self.tab1inner.layout.addWidget(self.cameraFrame)
 
         # Add Done Button last
         self.doneButton1 = QPushButton("DONE", self.tab1inner)
@@ -468,14 +468,14 @@ class CameraWidget (QWidget):
                 if ret_corners:
                     # Display the frame with corners
                     self.pixmap = self.imageToPixmap(frame_with_corners)
-                    self.imageLabel.setPixmap(self.pixmap)
+                    self.cameraFrame.setPixmap(self.pixmap)
                 else:
                     # Display the original frame
                     self.pixmap = self.imageToPixmap(frame_inverted)
-                    self.imageLabel.setPixmap(self.pixmap).scaled(450,450,Qt.KeepAspectRatio) # Update the QLabel with the captured image
+                    self.cameraFrame.setPixmap(self.pixmap) #.scaled(450,450,Qt.KeepAspectRatio) # Update the QLabel with the captured image
 
             # Ensure the image scales with the label
-            self.imageLabel.setScaledContents(True)
+            self.cameraFrame.setScaledContents(True)
             self.update()
     
     def update_countdown(self):
