@@ -31,8 +31,6 @@ from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QTimer
 
 # Dependency OpenCV 4.x, PyQT (Default in UBNT 22.04)
-
-# TODO Adding matplotlib to draw Field / Better visualization of results -> or other ...
 # TODO Default disable tab2, only enable after finish Calibartion or loading Calibration JSON
 
 #Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
@@ -54,9 +52,26 @@ class Warper(object):
         self.height = height
         self.supersample = supersample
         self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
-        W = self.width
-        H = self.height
+        #W = self.width
+        #H = self.height
+        W = self.width()  # Call the width method to get the actual value
+        H = self.height()  # Call the height method to get the actual value
+
+        print(f"W: {W}, H: {H}, Supersample: {supersample}")
+
+        ## TEST
+        # Check if W and H are integers or floats
+        if not isinstance(W, (int, float)) or not isinstance(H, (int, float)):
+            raise ValueError("Width and height should be numerical values.")
+
+        # Check if supersample is a numerical value
+        if not isinstance(supersample, (int, float)):
+            raise ValueError("Supersample should be a numerical value.")
+
         self.pts2 = np.float32([[0,0],[W*supersample,0],[0,H*supersample],[W*supersample,H*supersample]])
+
+        print("self.pts2:", self.pts2)
+
         self.M = cv2.getPerspectiveTransform(self.pts1,self.pts2)
         self.dst = None
         if (interpolation == None):
@@ -150,9 +165,6 @@ class CameraWidget (QWidget):
 
         # Set variable to store selected objectpoint for dewarp
         self.points = []
-
-        # Add a warper instance for dewarping
-        #self.warper = None
 
          # Add the supersample attribute
         self.supersample = 2 
@@ -287,18 +299,13 @@ class CameraWidget (QWidget):
 
         # Set alignment to center the text within the QLabel
         self.imageFrame.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
-
-        ## TO Update .resize not working
-
-        #self.imageFrame.resize(640, 480)
         self.imageFrame.setFrameShape(QFrame.Box)
         self.tab2inner.layout.addWidget(self.imageFrame)
 
-
         # Add Start De-warp Button last
-        self.startButtonDewarp = QPushButton("START De-Warp", self.tab2inner)
-        self.startButtonDewarp.clicked.connect(self.start_dewarp)
-        self.tab2inner.layout.addWidget(self.startButtonDewarp)
+        self.startButtonPwarp = QPushButton("START Perspective-Warp", self.tab2inner)
+        self.startButtonPwarp.clicked.connect(self.start_pwarp)
+        self.tab2inner.layout.addWidget(self.startButtonPwarp)
 
         # Add tab1inner to tab2
         self.tab2.layout.addWidget(self.tab2inner)
@@ -362,8 +369,6 @@ class CameraWidget (QWidget):
         #label_height = 240 # To small when using color
         label_height = 300
 
-        ###################################################
-
         # Draw and display soccer field in the ProcessFrame
         soccer_field_image = self.draw_soccer_field()
         soccer_field_pixmap = self.convert_cvimage_to_pixmap(soccer_field_image)
@@ -376,8 +381,6 @@ class CameraWidget (QWidget):
             #pixmap = cv2.imread(file_name)
             self.ProcessImage.setPixmap(pixmap)
             self.ProcessImage.setScaledContents(True) # needed or field wont fit
-
-        ###################################################
 
         # Calculate the corresponding width based on the aspect ratio
         label_width = int(label_height * aspect_ratio)
@@ -472,10 +475,10 @@ class CameraWidget (QWidget):
                 else:
                     # Display the original frame
                     self.pixmap = self.imageToPixmap(frame_inverted)
-                    self.cameraFrame.setPixmap(self.pixmap) #.scaled(450,450,Qt.KeepAspectRatio) # Update the QLabel with the captured image
+                    self.cameraFrame.setPixmap(self.pixmap)
 
-            # Ensure the image scales with the label
-            self.cameraFrame.setScaledContents(True)
+            # Ensure the image does not scales with the label -> issue with aspect ratio TODO
+            self.cameraFrame.setScaledContents(False)
             self.update()
     
     def update_countdown(self):
@@ -665,7 +668,7 @@ class CameraWidget (QWidget):
         else:
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
-            self.doneButton1.clicked.connect(self.start_dewarp) # change connect to calibartion test 
+            self.doneButton1.clicked.connect(self.start_pwarp) # change connect to calibartion test 
              
 
     def undistort_frame(self, frame, camera_matrix, distortion_coefficients):
@@ -708,7 +711,7 @@ class CameraWidget (QWidget):
             
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
-            self.doneButton1.clicked.connect(self.start_dewarp) # change connect to calibartion test 
+            self.doneButton1.clicked.connect(self.start_pwarp) # change connect to calibartion test 
 
             # Stop Camera feed
             self.timer.stop()
@@ -720,9 +723,9 @@ class CameraWidget (QWidget):
 
             # Maybe via dialog box (TODO)
 
-    # Below is mostly tab2 related De-Warp
+    # Below is mostly tab2 related to Perspective-Warp
 
-    # Add logic to select usb, image or network
+    # Add logic to select usb, image or network TODO
     
     # Slot function to enable or disable the "Load Image" button based on the radio button state
     def update_load_button_state(self):
@@ -745,12 +748,12 @@ class CameraWidget (QWidget):
         )
         if file_name:
             # Load the image using QPixmap
-            #pixmap = QPixmap(file_name)
+            # pixmap = QPixmap(file_name)
 
             # Set image Dewarp to True
             self.image_dewarp = True
 
-            # Load the image
+            # Load the image using OpenCv
             self.cv_image = cv2.imread(file_name)
             self.cv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_RGB2BGR)
 
@@ -815,14 +818,14 @@ class CameraWidget (QWidget):
 
         return image
     
-    def start_dewarp(self):
-        print("Starting De-Warp")
+    def start_pwarp(self):
+        print("Starting Perspective-Warp")
 
         # Stop Camera
         self.timer.stop()
 
         # Emit the signal with the updated status text
-        self.update_status_signal.emit("De-warp started")
+        self.update_status_signal.emit("Perspective Warp started")
 
         # Disable the first tab (Camera Calibration)
         self.tabs.setTabEnabled(0, False)
@@ -836,7 +839,7 @@ class CameraWidget (QWidget):
 
         # For Testing 
         # 1. Load image from R8 folder (1 camera view of 1/4 of the field)
-        #   Camera on spot in the Center Cirle (FCS 0,0) , center of the camera pointing to one corner 
+        #    Camera on spot in the Center Cirle (FCS 0,0) , center of the camera pointing to one corner 
         # 2. Show Image and a Birds eye view of the Soccer field below with corresponding land marks to select 
         # 3. Select 4 coordinates on Image that correspond to 4 landmarks on the birdseye view soccer field
         #    2.0 (just outside the Center Cirle towards the side line)
@@ -847,8 +850,6 @@ class CameraWidget (QWidget):
         # 5. Optimize landmark selection selections
         # 6. Save to binairy cv mat file
 
-        #Check what radio button is selected (USb is default)
-
         if self.image_dewarp == True:
             #image_dewarp()
             print("Starting image de-warp") #-> update status
@@ -856,9 +857,8 @@ class CameraWidget (QWidget):
             # Use the loaded image directly
             pixmap = self.imageFrame.pixmap()
 
-            # Not sure how to use below???? TODO
-            image = pixmap.toImage()
-            cv_frame = np.array(image.rgbSwapped())  # Convert to NumPy array
+            # image = pixmap.toImage()
+            # cv_frame = np.array(image.rgbSwapped())  # Convert to NumPy array
 
             frame = self.cv_image
 
@@ -869,10 +869,7 @@ class CameraWidget (QWidget):
                     height, width, _ = frame.shape
                     print(f"Frame Width: {width}, Height: {height}")
 
-                    
-                    #self.dewarp(frame)
-                    #self.dewarp(frame, self.supersample)  # Adjust the value as needed
-                    self.dewarp(frame, supersample=2)
+                    self.dewarp(frame)
 
                 else:
                     print("Invalid frame format: Not a 3D array (color image)")
@@ -887,7 +884,7 @@ class CameraWidget (QWidget):
             # Start the camera again
             self.timer.start(100)  # Assuming 100 milliseconds per frame update (fast is 20)
 
-            ########## To Update ######
+            # TODO
             ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
 
             if ret:  # if frame captured successfully
@@ -905,13 +902,9 @@ class CameraWidget (QWidget):
 
         #return warper
 
-    
-    #def dewarp(self, img):
-    def dewarp(self, img, supersample):
+    def dewarp(self, img):
         bgimage = img.copy()
-
         self.display_image(bgimage)
-
         self.imageFrame.mousePressEvent = self.mouse_click_event
 
         while True:
@@ -919,11 +912,10 @@ class CameraWidget (QWidget):
                 break
             QApplication.processEvents()
 
-        #warper = Warper(points=self.points, width=self.width, height=self.height, supersample=self.supersample)
-        warper = Warper(points=self.points, width=self.width, height=self.height, supersample=supersample)
+        warper = Warper(points=self.points, width=self.width, height=self.height, supersample=self.supersample)
+        #warper = Warper(points=self.points, width=self.width, height=self.height, supersample=supersample)
         return warper
 
-    
     def display_dewarped_image(self, dewarped_frame):
         # Display the dewarped image
         dewarped_pixmap = self.imageToPixmap(dewarped_frame)
@@ -1077,7 +1069,6 @@ class CamCalMain(QMainWindow):
     def update_status_bar(self, status_text):
         # Update the status bar text
         self.statusBar().showMessage(status_text)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
