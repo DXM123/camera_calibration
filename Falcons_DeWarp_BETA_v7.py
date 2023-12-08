@@ -46,16 +46,20 @@ soccer_field_length = 14
 ################# Perspective Warp Classes ################# 
 
 class Warper(object):
-    def __init__(self,points,width=229,height=229,supersample=2,interpolation=None):
+    def __init__(self,points,width=640,height=480,supersample=2,interpolation=None):
         self.points = points
         self.width  = width
         self.height = height
         self.supersample = supersample
-        self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
-        W = self.width()  # Call the width method to get the actual value
-        H = self.height()  # Call the height method to get the actual value
 
-        print(f"W: {W}, H: {H}, Supersample: {supersample}")
+        # TODO use the correct landmarks 2,0 6,0 0,2 0,6 
+        self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
+
+        # Call the height and width method to get the actual value of the frame
+        W = self.width()
+        H = self.height()
+
+        print(f"W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
 
         ## TEST
         # Check if W and H are integers or floats
@@ -78,14 +82,18 @@ class Warper(object):
             self.interpolation = interpolation
 
     def warp(self,img,out=None):
-        M = self.M
+        # Call the height and width method to get the actual value of the frame
         W = self.width()  # Call the width method to get the actual value
         H = self.height()  # Call the height method to get the actual value
+
+        M = self.M
         supersample = self.supersample
+
         if self.dst is None:
             self.dst = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
         else:
             self.dst[:] = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
+
         # unnecessarily complicated
         if supersample == 1:
             if out == None:
@@ -107,7 +115,7 @@ class CameraWidget (QWidget):
     update_status_signal = pyqtSignal(str)
 
     # Set the initial countdown time to save images
-    countdown_seconds = 3
+    countdown_seconds = 2 # 3 seconds feels long
 
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
