@@ -998,8 +998,14 @@ class CamCalMain(QMainWindow):
         self.camera_widget.update_status_signal.connect(self.update_status_bar)
 
     def check_output_empty(self):
+        # Check if the output folder exists
+        output_folder = "./output"
+        if not os.path.exists(output_folder):
+            QMessageBox.information(self, "Info", "The output folder does not exist.", QMessageBox.Ok)
+            return
+
         # Check if there are existing images in the output folder
-        existing_images = [f for f in os.listdir("./output") if f.startswith("corner_") and f.endswith(".png")]
+        existing_images = [f for f in os.listdir(output_folder) if f.startswith("corner_") and f.endswith(".png")]
 
         if existing_images:
             # Ask the user if they want to delete existing images
@@ -1011,7 +1017,7 @@ class CamCalMain(QMainWindow):
             if reply == QMessageBox.Yes:
                 # Delete existing images
                 for image_file in existing_images:
-                    file_path = os.path.join("./output", image_file)
+                    file_path = os.path.join(output_folder, image_file)
                     os.remove(file_path)
                 
                 # Inform the user about the deletion
