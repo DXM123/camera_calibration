@@ -55,11 +55,13 @@ class Warper(object):
         # TODO use the correct landmarks 2,0 6,0 0,2 0,6 
         self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
 
+        print("self.pts1:", self.pts1)
+
         # Call the height and width method to get the actual value of the frame
         W = self.width()
         H = self.height()
 
-        print(f"W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
+        print(f"Check 1 | W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
 
         ## TEST
         # Check if W and H are integers or floats
@@ -72,7 +74,7 @@ class Warper(object):
 
         self.pts2 = np.float32([[0,0],[W*supersample,0],[0,H*supersample],[W*supersample,H*supersample]])
 
-        print("self.pts2:", self.pts2)
+        print("self.pts2:", self.pts2) # Now set to outer display coordinates TODO
 
         self.M = cv2.getPerspectiveTransform(self.pts1,self.pts2)
         self.dst = None
@@ -88,6 +90,8 @@ class Warper(object):
 
         M = self.M
         supersample = self.supersample
+
+        print(f"Check 2 | W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
 
         if self.dst is None:
             self.dst = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
@@ -377,7 +381,8 @@ class CameraWidget (QWidget):
 
         # Draw and display soccer field in the ProcessFrame
         soccer_field_image = self.draw_soccer_field()
-        soccer_field_pixmap = self.convert_cvimage_to_pixmap(soccer_field_image)
+        # soccer_field_pixmap = self.convert_cvimage_to_pixmap(soccer_field_image)
+        soccer_field_pixmap = self.imageToPixmap(soccer_field_image) ## Test
 
         if soccer_field_pixmap:
              # Load the image using QPixmap
@@ -443,12 +448,20 @@ class CameraWidget (QWidget):
         # Toggle capture state
         self.capture_started = not self.capture_started
     
+    # Check def convert_cvimage)to_pixmap / def imageToPixmap (are they the same)
     def imageToPixmap(self, image):
         qformat = QImage.Format_RGB888
         img = QImage(image, image.shape[1], image.shape[0] , image.strides[0], qformat)
-        img = img.rgbSwapped()  # BGR > RGB
+        # img = img.rgbSwapped()  # BGR > RGB # remove it here for now
         # print("Pixmap conversion successful")
         return QPixmap.fromImage(img)
+    
+    # Check def convert_cvimage)to_pixmap / def imageToPixmap (are they the same) -> This one not used now
+    #def convert_cvimage_to_pixmap(self, image):
+    #    height, width, channel = image.shape
+    #    bytesPerLine = 3 * width
+    #    qImg = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888)
+    #    return QPixmap.fromImage(qImg)
     
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
@@ -739,12 +752,7 @@ class CameraWidget (QWidget):
             self.loadImage.setEnabled(False)
         else:
             self.loadImage.setEnabled(True)
-
-    def convert_cvimage_to_pixmap(self, image):
-        height, width, channel = image.shape
-        bytesPerLine = 3 * width
-        qImg = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888)
-        return QPixmap.fromImage(qImg)
+    
 
     def load_image(self):
         options = QFileDialog.Options()
@@ -764,7 +772,8 @@ class CameraWidget (QWidget):
             self.cv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_RGB2BGR)
 
             # Covert to Pixmap
-            pixmap = self.convert_cvimage_to_pixmap(self.cv_image)
+            # pixmap = self.convert_cvimage_to_pixmap(self.cv_image)
+            pixmap = self.imageToPixmap(self.cv_image) ## Test
 
             # Show stuff
             self.imageFrame.setPixmap(pixmap)
@@ -824,13 +833,13 @@ class CameraWidget (QWidget):
 
         return image
     
-    def start_pwarp(self):
-        print("Starting Perspective-Warp")
+    def start_pwarp(self):       
 
         # Stop Camera
         self.timer.stop()
 
         # Emit the signal with the updated status text
+        print("Starting Perspective-Warp")
         self.update_status_signal.emit("Perspective Warp started")
 
         # Disable the first tab (Camera Calibration)
@@ -870,9 +879,6 @@ class CameraWidget (QWidget):
             # Check if 'frame' is a valid NumPy array
             if isinstance(frame, np.ndarray):
                 if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
-                    # Now you can use 'frame' with the desired color format
-                    # height, width, _ = frame.shape
-                    # print(f"Frame Width: {width}, Height: {height}")
 
                     #self.dewarp(frame) # return warper
                     self.warper_result = self.dewarp(frame) # return warper
@@ -884,7 +890,18 @@ class CameraWidget (QWidget):
                     # Update the display with the dewarped image
                     self.display_dewarped_image(dewarped_frame)
     
+                    # Emit the signal with the updated status text
                     QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
+                    print("Dewarping process completed.")
+                    self.update_status_signal.emit("Dewarping process completed.")
+
+                    # Update button text
+                    self.startButtonPwarp.setText("DONE")
+
+                    # Disable Capture Button when import succeeded
+                    self.loadImage.setDisabled(True)  # LoadImage / load_image confusing
+
+                    # TODO next steps
 
                 else:
                     print("Invalid frame format: Not a 3D array (color image)")
