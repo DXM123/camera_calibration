@@ -52,8 +52,6 @@ class Warper(object):
         self.height = height
         self.supersample = supersample
         self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
-        #W = self.width
-        #H = self.height
         W = self.width()  # Call the width method to get the actual value
         H = self.height()  # Call the height method to get the actual value
 
@@ -80,9 +78,9 @@ class Warper(object):
             self.interpolation = interpolation
 
     def warp(self,img,out=None):
-        W = self.width
-        H = self.height
         M = self.M
+        W = self.width()  # Call the width method to get the actual value
+        H = self.height()  # Call the height method to get the actual value
         supersample = self.supersample
         if self.dst is None:
             self.dst = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
@@ -851,7 +849,6 @@ class CameraWidget (QWidget):
         # 6. Save to binairy cv mat file
 
         if self.image_dewarp == True:
-            #image_dewarp()
             print("Starting image de-warp") #-> update status
 
             # Use the loaded image directly
@@ -866,10 +863,20 @@ class CameraWidget (QWidget):
             if isinstance(frame, np.ndarray):
                 if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
                     # Now you can use 'frame' with the desired color format
-                    height, width, _ = frame.shape
-                    print(f"Frame Width: {width}, Height: {height}")
+                    # height, width, _ = frame.shape
+                    # print(f"Frame Width: {width}, Height: {height}")
 
-                    self.dewarp(frame)
+                    #self.dewarp(frame) # return warper
+                    self.warper_result = self.dewarp(frame) # return warper
+
+                    #original_inverted_frame = frame_inverted.copy()  # Store the original frame
+                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    dewarped_frame = self.warper_result.warp(undistorted_frame.copy())  # Perform dewarping
+
+                    # Update the display with the dewarped image
+                    self.display_dewarped_image(dewarped_frame)
+    
+                    QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
 
                 else:
                     print("Invalid frame format: Not a 3D array (color image)")
@@ -888,11 +895,12 @@ class CameraWidget (QWidget):
             ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
 
             if ret:  # if frame captured successfully
-                frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
-                original_inverted_frame = frame_inverted.copy()  # Store the original frame
-                undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                dewarped_frame = self.warper.warp(undistorted_frame.copy())  # Perform dewarping
-                self.display_dewarped_image(dewarped_frame)
+                #frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
+                #original_inverted_frame = frame_inverted.copy()  # Store the original frame
+                #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                #dewarped_frame = self.warper.warp(undistorted_frame.copy())  # Perform dewarping
+                #self.display_dewarped_image(dewarped_frame)
+                pass # temp
 
         elif self.network_dewarp == True:
             #network_dewarp()
@@ -900,7 +908,6 @@ class CameraWidget (QWidget):
 
             # TODO
 
-        #return warper
 
     def dewarp(self, img):
         bgimage = img.copy()
@@ -913,7 +920,7 @@ class CameraWidget (QWidget):
             QApplication.processEvents()
 
         warper = Warper(points=self.points, width=self.width, height=self.height, supersample=self.supersample)
-        #warper = Warper(points=self.points, width=self.width, height=self.height, supersample=supersample)
+
         return warper
 
     def display_dewarped_image(self, dewarped_frame):
