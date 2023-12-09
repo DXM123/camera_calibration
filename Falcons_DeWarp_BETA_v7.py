@@ -404,7 +404,28 @@ class CameraWidget (QWidget):
 
         self.ProcessFrame.layout.addWidget(self.ProcessImage)   
 
-        # Add Process Options TODO
+        # Add Process Options TODO #################
+        
+
+        # Add process Output Display (display at start is to small)
+        self.processOutputWindowLabel = QLabel('Output Display:', self)
+        #self.processOutputWindow = QLineEdit()
+        self.processoutputWindow = QTextEdit()
+        self.processoutputWindow.setReadOnly(True)
+
+        # Set the size policy to make the process output window stretch vertically
+        processoutputSizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.processoutputWindow.setSizePolicy(processoutputSizePolicy)
+
+        # Set the alignment of the process output window
+        processoutputWindowAlignment = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        self.processoutputWindow.setAlignment(processoutputWindowAlignment)
+
+        # Also add output window here
+        self.ProcessFrame.layout.addWidget(self.processOutputWindowLabel)
+        self.ProcessFrame.layout.addWidget(self.processoutputWindow)
+
+        #############################################
 
         # Add optionsFrame to the right side
         self.tab2.layout.addWidget(self.ProcessFrame)
@@ -778,15 +799,21 @@ class CameraWidget (QWidget):
 
             # Show stuff
             self.imageFrame.setPixmap(pixmap)
-            self.imageFrame.setScaledContents(True)
+            self.imageFrame.setScaledContents(False) # Set to false to prevent issues with aspect ratio
 
             #return self.cv_image
     
     def draw_soccer_field(self):
+
+        # Field Size: The official field size for MSL is 18×12 meters, spect ratio 2:3.
+        # Goal Area: 6×2 meters.
+        # Penalty Area: 10×4 meters.
+        # Center Circle: Radius of 0.75 meters.
+        # Goal Width: 2 meters.
+
         # Below is by no means official sizing for MSL
+        # height, width = 600, 900
         height, width = 500, 1000
-        # Create a blank image (blank background)
-        # image = np.ones((height, width, 3), dtype=np.uint8) * 255
 
         # Create a blank image (light green background)
         image = np.ones((height, width, 3), dtype=np.uint8) * np.array(self.lightgreen, dtype=np.uint8)
