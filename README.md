@@ -37,8 +37,17 @@ This Python application provides a user-friendly tool for camera calibration and
 
 1. Clone the repository:
 
-   ```bash
-   git clone https://github.com/DXM123/camera_calibration.git
+    ```bash
+    git clone https://github.com/DXM123/camera_calibration.git
+    ```
+2. Make sure opencv is availble. You can install it with
 
-2. Make sure opencv is availble
-3. Run the script (make executable first)
+    ```bash
+    sudo apt-get install python3-opencv
+    ```
+    and install other requirements (`numpy` and `PyQt5`) with
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+4. Run the script (make executable first)
