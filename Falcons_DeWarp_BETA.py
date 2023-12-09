@@ -39,9 +39,105 @@ no_of_rows = 7  #number of rows of your Checkerboard
 square_size = 27.0 # size of square on the Checkerboard in mm -> This is no longer required?
 min_cap = 3 # minimum or images to be collected by capturing (Default is 10), minimum is 3
 
-# Assuming the soccer field is 22 x 14 meters
+# Assuming the soccer field is 22 x 14 meters - old
 soccer_field_width = 22
 soccer_field_length = 14
+
+# Field Size and other dimensions for MSL field 18 x 12 meter 
+field_length = 18  # meters
+field_width = 12  # meters
+penalty_area_length = 2.25  # E, meters
+penalty_area_width = 6.5  # C, meters
+goal_area_length = 0.75  # F, meters
+goal_area_width = 3.5  # D, meters
+center_circle_radius = 2  # H, meters
+goal_depth = 0.5  # Goal depth,
+goal_width = 2.0  # Goal width 2m for this field -> 2.4m allowed?
+line_width = 0.125  # K, meters
+ppm = 100  # pixels per meter
+safe_zone = 1  # Safety zone around the field, meters
+
+# Define basic colors for Soccer Field (RGB)
+black = (0, 0, 0)
+white = (255, 255, 255)
+gray = (128, 128, 128)
+red = (255, 0, 0)
+green = (0, 255, 0)
+lightgreen = (144, 238, 144)
+darkgreen = (0, 100, 0)
+blue = (0, 0, 255)
+lightblue = (173, 216, 230)
+pink = (255, 192, 203)
+magenta = (255, 0, 255)
+
+################## Field Drawing Class ####################
+
+class Draw_SoccerField:
+    def __init__(self):
+        self.length = field_length + 2 * safe_zone  # Adding safety zone to the length
+        self.width = field_width + 2 * safe_zone  # Adding safety zone to the width
+        self.line_width = line_width
+        self.center_circle_radius = center_circle_radius
+        self.ppm = ppm
+        self.safe_zone = safe_zone
+
+        # Create a blank image (dark green background)
+        self.field_image = np.full((int(self.width * self.ppm), int(self.length * self.ppm), 3), darkgreen, dtype=np.uint8)
+
+    def draw_line(self, start_point, end_point):
+        thickness = int(self.line_width * self.ppm)
+        start_pixel = (int(start_point[0] * self.ppm), int(start_point[1] * self.ppm))
+        end_pixel = (int(end_point[0] * self.ppm), int(end_point[1] * self.ppm))
+        cv2.line(self.field_image, start_pixel, end_pixel, (white), thickness)
+
+    def draw_circle(self, center, radius):
+        center_pixel = (int(center[0] * self.ppm), int(center[1] * self.ppm))
+        cv2.circle(self.field_image, center_pixel, int(radius * self.ppm), (white), int(self.line_width * self.ppm))
+
+    def draw_rectangle(self, top_left, bottom_right):
+        top_left_pixel = (int(top_left[0] * self.ppm), int(top_left[1] * self.ppm))
+        bottom_right_pixel = (int(bottom_right[0] * self.ppm), int(bottom_right[1] * self.ppm))
+        cv2.rectangle(self.field_image, top_left_pixel, bottom_right_pixel, (white), int(self.line_width * self.ppm))
+
+    def draw_goal(self, center, width, depth):
+        # Goals are drawn as rectangles perpendicular to the field's length
+        half_width = width / 2
+        top_left = (center[0] - depth, center[1] - half_width)
+        bottom_right = (center[0], center[1] + half_width)
+        self.draw_rectangle(top_left, bottom_right)
+
+    def generate_field(self):
+        # Draw the safety zone
+        self.draw_rectangle((self.safe_zone, self.safe_zone), (self.length - self.safe_zone, self.width - self.safe_zone))
+
+        # Offset all field elements by the safety zone
+        offset = self.safe_zone
+
+        # Drawing the outline of the field
+        self.draw_rectangle((offset, offset), (self.length - offset, self.width - offset))
+
+        # Drawing the center line
+        self.draw_line((self.length / 2, offset), (self.length / 2, self.width - offset))
+
+        # Drawing the center circle
+        self.draw_circle((self.length / 2, self.width / 2), self.center_circle_radius)
+
+        # Drawing the penalty areas
+        # Only the x-coordinate (left and right positions) is adjusted by the offset
+        self.draw_rectangle((offset, (self.width - penalty_area_width) / 2), (penalty_area_length + offset, (self.width + penalty_area_width) / 2))
+        self.draw_rectangle((self.length - penalty_area_length - offset, (self.width - penalty_area_width) / 2), (self.length - offset, (self.width + penalty_area_width) / 2))
+
+        # Drawing the goal areas
+        # Only the x-coordinate (left and right positions) is adjusted by the offset
+        self.draw_rectangle((offset, (self.width - goal_area_width) / 2), (goal_area_length + offset, (self.width + goal_area_width) / 2))
+        self.draw_rectangle((self.length - goal_area_length - offset, (self.width - goal_area_width) / 2), (self.length - offset, (self.width + goal_area_width) / 2))
+
+        # Drawing the goals
+        # The goals are drawn at the start and end of the field, adjusted by the offset
+        self.draw_goal((0 + offset, self.width / 2), goal_width, goal_depth)
+        self.draw_goal((self.length - goal_depth, self.width / 2), goal_width, goal_depth)
+
+        return self.field_image
 
 ################# Perspective Warp Classes ################# 
 
@@ -160,18 +256,6 @@ class CameraWidget (QWidget):
         self.camera_dist_coeff = None
 
         # Do i need rvecs and tvecs?
-
-        # Define basic colors for Soccer Field (RGB)
-        self.black = (0, 0, 0)
-        self.white = (255, 255, 255)
-        self.gray = (128, 128, 128)
-        self.red = (255, 0, 0)
-        self.green = (0, 255, 0)
-        self.lightgreen = (144, 238, 144)
-        self.blue = (0, 0, 255)
-        self.lightblue = (173, 216, 230)
-        self.pink = (255, 192, 203)
-        self.magenta = (255, 0, 255)
 
         # Define basic line thickness to draw soccer field
         self.line_thickness = 2
@@ -382,7 +466,9 @@ class CameraWidget (QWidget):
         label_height = 300
 
         # Draw and display soccer field in the ProcessFrame
-        soccer_field_image = self.draw_soccer_field()
+        field_drawer = Draw_SoccerField()
+        soccer_field_image = field_drawer.generate_field()
+
         # soccer_field_pixmap = self.convert_cvimage_to_pixmap(soccer_field_image)
         soccer_field_pixmap = self.imageToPixmap(soccer_field_image) ## Test
 
@@ -402,11 +488,8 @@ class CameraWidget (QWidget):
         self.ProcessImage.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.ProcessImage.setFixedSize(label_width, label_height)
 
-        self.ProcessFrame.layout.addWidget(self.ProcessImage)   
-
-        # Add Process Options TODO #################
+        self.ProcessFrame.layout.addWidget(self.ProcessImage)
         
-
         # Add process Output Display (display at start is to small)
         self.processOutputWindowLabel = QLabel('Output Display:', self)
         #self.processOutputWindow = QLineEdit()
@@ -424,8 +507,6 @@ class CameraWidget (QWidget):
         # Also add output window here
         self.ProcessFrame.layout.addWidget(self.processOutputWindowLabel)
         self.ProcessFrame.layout.addWidget(self.processoutputWindow)
-
-        #############################################
 
         # Add optionsFrame to the right side
         self.tab2.layout.addWidget(self.ProcessFrame)
@@ -775,7 +856,6 @@ class CameraWidget (QWidget):
         else:
             self.loadImage.setEnabled(True)
     
-
     def load_image(self):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -802,64 +882,6 @@ class CameraWidget (QWidget):
             self.imageFrame.setScaledContents(False) # Set to false to prevent issues with aspect ratio
 
             #return self.cv_image
-    
-    def draw_soccer_field(self):
-
-        # Field Size: The official field size for MSL is 18×12 meters, spect ratio 2:3.
-        # Goal Area: 6×2 meters.
-        # Penalty Area: 10×4 meters.
-        # Center Circle: Radius of 0.75 meters.
-        # Goal Width: 2 meters.
-
-        # Below is by no means official sizing for MSL
-        # height, width = 600, 900
-        height, width = 500, 1000
-
-        # Create a blank image (light green background)
-        image = np.ones((height, width, 3), dtype=np.uint8) * np.array(self.lightgreen, dtype=np.uint8)
-
-        # Set line color
-        line_color = self.white
-
-        # Draw the soccer field boundary
-        # The rectangle goes from (50, 50) to (950, 450) on the picture,
-        cv2.rectangle(image, (50, 50), (950, 450), line_color, self.line_thickness)
-
-        # Draw the center circle
-        # The circle is centered at (500, 250), has a radius of 40 pixels
-        # PLease note that 500, 250 is 0, 0 in Field Coordinate System 
-        cv2.circle(image, (500, 250), 60, line_color, self.line_thickness)
-
-        # Draw goal areas
-        # The rectangle goes from (xx, xx) to (xxx, xxx) on the picture,
-        cv2.rectangle(image, (50, 200), (100, 300), line_color, self.line_thickness)
-        cv2.rectangle(image, (900, 200), (950, 300), line_color, self.line_thickness)
-
-        # Draw goals
-        # The rectangle goes from (xx, xx) to (xxx, xxx) on the picture,
-        cv2.rectangle(image, (50, 225), (51, 275), line_color, self.line_thickness)
-        cv2.rectangle(image, (949, 225), (950, 275), line_color, self.line_thickness)
-
-        # Draw penalty areas
-        # The rectangle goes from (xx, xx) to (xxx, xxx) on the picture,
-        cv2.rectangle(image, (50, 100), (200, 400), line_color, self.line_thickness)
-        cv2.rectangle(image, (800, 100), (950, 400), line_color, self.line_thickness)
-
-        # Draw the middle line
-        # The line goes from (500, 50) to (500, 450)
-        cv2.line(image, (500, 50), (500, 450), line_color, self.line_thickness)
-
-        # Red dot at position (500, 250) with a radius of 5
-        # 500, 250 = 0, 0 in FCS (camera position)
-        cv2.circle(image, (500, 250), 5, (self.red), -1)  # -1 means fill the circle
-
-        # 500, 450 = 6, 0 in FCS is landmark for top left 1/4 of the field
-        cv2.circle(image, (500, 450), 5, (self.gray), -1)
-
-        # 500, 325 = 2, 0 in FCS if we calculate it
-        cv2.circle(image, (500, 325), 5, (self.gray), -1)
-
-        return image
     
     def start_pwarp(self):       
 
