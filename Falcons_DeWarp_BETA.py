@@ -92,39 +92,39 @@ landmark4 = (0,6) # 0, field_lenght / 2 - penalty_spot (3)
 
 # Center Spot 0,0 FCS
 FCS0 = (int(field_length_total / 2) * ppm, int(field_width_total / 2) * ppm )
-print(f"FCS 0,0 {FCS0}")
+#print(f"FCS 0,0 {FCS0}")
 
 # Marker Spot 0,2 FCS
 FCS02 = (int((field_length_total / 2) * ppm) - int(2 * ppm), int(field_width_total / 2) * ppm )
-print(f"FCS 0,2 {FCS02}")
+#print(f"FCS 0,2 {FCS02}")
 
 # Marker Spot 0,6 FCS - Penalty spot left
 FCS06 = (int((field_length_total / 2) * ppm) - int(6 * ppm), int(field_width_total / 2) * ppm )
-print(f"FCS 0,6 {FCS06}")
+#print(f"FCS 0,6 {FCS06}")
 
 # Marker Spot 2,0 FCS
 FCS20 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - int(2 * ppm))
-print(f"FCS 2,0 {FCS20}")
+#print(f"FCS 2,0 {FCS20}")
 
 # Marker Spot 6,0 FCS
 FCS60 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - int(6 * ppm))
-print(f"FCS 6,0 {FCS60}")
+#print(f"FCS 6,0 {FCS60}")
 
 # Marker Spot -2,0 FCS
 FCSmin20 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) + (2 * ppm))
-print(f"FCS -2,0 {FCSmin20}")
+#print(f"FCS -2,0 {FCSmin20}")
 
 # Marker Spot -6,0 FCS
 FCSmin60 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) + (6 * ppm))
-print(f"FCS -6,0 {FCSmin60}")
+#print(f"FCS -6,0 {FCSmin60}")
 
 # Marker Spot 0,-2 FCS
 FCS0min2 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - (2 * ppm))
-print(f"FCS 0,-2 {FCS0min2}")
+#print(f"FCS 0,-2 {FCS0min2}")
 
 # Marker Spot 0,-6 FCS
 FCS0min6 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - (6 * ppm))
-print(f"FCS 0,-6 {FCS0min6}")
+#print(f"FCS 0,-6 {FCS0min6}")
 
 ################## Field Drawing Class ####################
 
@@ -968,6 +968,10 @@ class CameraWidget (QWidget):
         print("Starting Perspective-Warp")
         self.update_status_signal.emit("Perspective Warp started")
 
+        # Temp disable Start button untill all 4 points are collected TODO
+        # self.startButtonPwarp.setText("Select the Landmarks before proceeding")
+        self.startButtonPwarp.setDisabled(True)
+
         # Disable the first tab (Camera Calibration)
         self.tabs.setTabEnabled(0, False)
 
@@ -975,7 +979,7 @@ class CameraWidget (QWidget):
         self.tabs.setCurrentIndex(1)
 
         if self.image_dewarp == True:
-            print("Starting image de-warp") #-> update status
+            print("Starting image de-warp") #-> update status         
 
             # Use the loaded image directly
             # pixmap = self.imageFrame.pixmap()
@@ -987,6 +991,10 @@ class CameraWidget (QWidget):
 
             # Check if 'frame' is a valid NumPy array
             if isinstance(frame, np.ndarray):
+
+                # Disable Load image Button when import succeeded and dearp started
+                self.loadImage.setDisabled(True)  # LoadImage / load_image confusing
+
                 if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
 
                     self.warper_result = self.dewarp(frame) # return warper
@@ -1000,22 +1008,21 @@ class CameraWidget (QWidget):
                     # Update the display with the dewarped image
                     self.display_dewarped_image(dewarped_frame)
 
-                    # Emit the signal with the updated status text
-                    QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
-
                     # Print stuff and update status bar
                     print("Dewarping process completed.")
                     self.update_status_signal.emit("Dewarping process completed.")
 
-                    # Update button text
-                    self.startButtonPwarp.setText("DONE")
+                    # Emit the signal with the updated status text - TODO Ask for tweaking
+                    # QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
+
+                    # Update button text for next step
+                    #self.startButtonPwarp.setText("DONE")
+                    #self.startButtonPwarp.clicked.connect(self.close_application) # close when done
+                    self.startButtonPwarp.setText("Tweak Landmarks")
+                    
+                    # TODO next steps - Tweak landmarks
+                    self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
                     self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
-                    self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> QMessageBox gets triggered again here TODO
-
-                    # Disable Capture Button when import succeeded
-                    self.loadImage.setDisabled(True)  # LoadImage / load_image confusing
-
-                    # TODO next steps
 
                 else:
                     print("Invalid frame format: Not a 3D array (color image)")
@@ -1044,8 +1051,12 @@ class CameraWidget (QWidget):
         elif self.network_dewarp == True:
             #network_dewarp()
             print("Starting network de-warp") #-> update status
+    
+    def tweak_pwarp(self):
+        # Print new instruction
+        self.processoutputWindow.setText(f"Tweaks landmark {landmark1}")
 
-            # TODO
+        # TODO
 
     def close_application(self):
         QApplication.quit()
@@ -1115,7 +1126,13 @@ class CameraWidget (QWidget):
                 self.ProcessImage.setScaledContents(True)
 
             if len(self.points) == 4:
+
+                # Temp Enable Start button again when all 4 points are collected TODO
+                # self.startButtonPwarp.setText("Select the Landmarks before proceeding")
+                self.startButtonPwarp.setDisabled(False)
+
                 break
+
             QApplication.processEvents()
 
         print(f"Check 1 self | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
@@ -1133,7 +1150,6 @@ class CameraWidget (QWidget):
         cv2.putText(image, f"{landmark}", (landmark[0] + 20, landmark[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (green), 2, cv2.LINE_AA) # light green coords
         
         return image
-
 
     def display_dewarped_image(self, dewarped_frame):
         # Display the dewarped image
@@ -1287,6 +1303,7 @@ class CamCalMain(QMainWindow):
     def update_status_bar(self, status_text):
         # Update the status bar text
         self.statusBar().showMessage(status_text)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
