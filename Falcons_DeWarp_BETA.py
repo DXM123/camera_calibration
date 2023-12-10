@@ -234,8 +234,8 @@ class Warper(object):
         if not isinstance(supersample, (int, float)):
             raise ValueError("Supersample should be a numerical value.")
 
-        # TODO use the correct landmarks 2,0 6,0 0,2 0,6 
-        self.pts2 = np.float32([[0,0],[W*supersample,0],[0,H*supersample],[W*supersample,H*supersample]])
+        # Update self.pts2 with the FCS landmarks 2,0 6,0 0,2 0,6 
+        self.pts2 = np.float32([FCS02, FCS06, FCS20, FCS60])
 
         print("self.pts2:", self.pts2)
 
