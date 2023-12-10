@@ -2,7 +2,6 @@
 
 import sys
 import cv2
-import time
 import datetime
 import os
 import json # OOB available in python (to save calibration file)
@@ -27,11 +26,14 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
 )
-from PyQt5.QtGui import QIcon, QPixmap, QImage, QColor
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QTimer
 
-# Dependency OpenCV 4.x, PyQT (Default in UBNT 22.04)
+# Dependency OpenCV 4.x, PyQT5 + Numpy (Default in UBNT 22.04)
 # TODO Default disable tab2, only enable after finish Calibartion or loading Calibration JSON
+# TODO Add logic for usb, and network
+# TODO Optimize landmark selection selections
+# TODO Save to binairy cv mat file
 
 #Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns = 7  #number of columns of your Checkerboard
@@ -51,11 +53,16 @@ penalty_area_width = 6.5  # C, meters
 goal_area_length = 0.75  # F, meters
 goal_area_width = 3.5  # D, meters
 center_circle_radius = 2  # H, meters
+spot_radius = 0.15
 goal_depth = 0.5  # Goal depth,
 goal_width = 2.0  # Goal width 2m for this field -> 2.4m allowed?
 line_width = 0.125  # K, meters
 ppm = 100  # pixels per meter
 safe_zone = 1  # Safety zone around the field, meters
+
+### Total Field Size
+field_length_total = field_length + 2 * safe_zone  # Adding safety zone to the length
+field_width_total = field_width + 2 * safe_zone  # Adding safety zone to the width
 
 # Define basic colors for Soccer Field (RGB)
 black = (0, 0, 0)
@@ -70,6 +77,55 @@ lightblue = (173, 216, 230)
 pink = (255, 192, 203)
 magenta = (255, 0, 255)
 
+# For 18 x 12 meter Field
+# Landmark 1, where the middle circle meets the middle line
+landmark1 = (2,0)
+
+# Landmark 2, where the middle line meets the outer field line
+landmark2 = (6,0) # field_width / 2, 0
+
+# Landmark 3, from the center circle spot towards the goal, where the (fictive) line meets the center circle line
+landmark3 = (0,2) # 0, center_circle_radius
+
+# # Landmark 4, Penalty Spot
+landmark4 = (0,6) # 0, field_lenght / 2 - penalty_spot (3)
+
+# Center Spot 0,0 FCS
+FCS0 = (int(field_length_total / 2) * ppm, int(field_width_total / 2) * ppm )
+print(f"FCS 0,0 {FCS0}")
+
+# Marker Spot 0,2 FCS
+FCS02 = (int((field_length_total / 2) * ppm) - int(2 * ppm), int(field_width_total / 2) * ppm )
+print(f"FCS 0,2 {FCS02}")
+
+# Marker Spot 0,6 FCS - Penalty spot left
+FCS06 = (int((field_length_total / 2) * ppm) - int(6 * ppm), int(field_width_total / 2) * ppm )
+print(f"FCS 0,6 {FCS06}")
+
+# Marker Spot 2,0 FCS
+FCS20 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - int(2 * ppm))
+print(f"FCS 2,0 {FCS20}")
+
+# Marker Spot 6,0 FCS
+FCS60 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - int(6 * ppm))
+print(f"FCS 6,0 {FCS60}")
+
+# Marker Spot -2,0 FCS
+FCSmin20 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) + (2 * ppm))
+print(f"FCS -2,0 {FCSmin20}")
+
+# Marker Spot -6,0 FCS
+FCSmin60 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) + (6 * ppm))
+print(f"FCS -6,0 {FCSmin60}")
+
+# Marker Spot 0,-2 FCS
+FCS0min2 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - (2 * ppm))
+print(f"FCS 0,-2 {FCS0min2}")
+
+# Marker Spot 0,-6 FCS
+FCS0min6 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - (6 * ppm))
+print(f"FCS 0,-6 {FCS0min6}")
+
 ################## Field Drawing Class ####################
 
 class Draw_SoccerField:
@@ -80,6 +136,7 @@ class Draw_SoccerField:
         self.center_circle_radius = center_circle_radius
         self.ppm = ppm
         self.safe_zone = safe_zone
+        self.spot_radius = spot_radius
 
         # Create a blank image (dark green background)
         self.field_image = np.full((int(self.width * self.ppm), int(self.length * self.ppm), 3), darkgreen, dtype=np.uint8)
@@ -91,6 +148,10 @@ class Draw_SoccerField:
         cv2.line(self.field_image, start_pixel, end_pixel, (white), thickness)
 
     def draw_circle(self, center, radius):
+        center_pixel = (int(center[0] * self.ppm), int(center[1] * self.ppm))
+        cv2.circle(self.field_image, center_pixel, int(radius * self.ppm), (white), int(self.line_width * self.ppm))
+
+    def draw_spot(self, center, radius):
         center_pixel = (int(center[0] * self.ppm), int(center[1] * self.ppm))
         cv2.circle(self.field_image, center_pixel, int(radius * self.ppm), (white), int(self.line_width * self.ppm))
 
@@ -136,6 +197,9 @@ class Draw_SoccerField:
         # The goals are drawn at the start and end of the field, adjusted by the offset
         self.draw_goal((0 + offset, self.width / 2), goal_width, goal_depth)
         self.draw_goal((self.length - goal_depth, self.width / 2), goal_width, goal_depth)
+
+        # Drawing Center Spot 0,0 FCS
+        self.draw_spot((self.length / 2, self.width / 2), self.spot_radius )
 
         return self.field_image
 
@@ -190,8 +254,6 @@ class Warper(object):
         M = self.M
         supersample = self.supersample
 
-        #print(f"Check | W: {W}, H: {H}, Supersample: {supersample}") # is using wrong values -> cameraFrame
-
         if self.dst is None:
             self.dst = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
         else:
@@ -200,15 +262,22 @@ class Warper(object):
         # unnecessarily complicated
         if supersample == 1:
             if out == None:
+
                 return self.dst
+            
             else:
                 out[:] = self.dst
+
                 return out
+            
         else:
             if out == None:
+
                 return cv2.resize(self.dst, (W,H), interpolation=self.interpolation)
+            
             else:
                 out[:] = cv2.resize(self.dst, (W,H), interpolation=self.interpolation)
+
                 return out
 
 ###############################################################
@@ -243,8 +312,11 @@ class CameraWidget (QWidget):
         self.cap = cv2.VideoCapture(0) # webcam object
         self.pixmap = None
 
-        # Add cv_image
+        # Add cv_image Temp
         self.cv_image = None
+
+        # Add field_image Temp
+        self.field_image = None
 
         # Placeholder to count the ammount of images saved
         self.ImagesCounter = 0
@@ -414,7 +486,6 @@ class CameraWidget (QWidget):
         #self.ProcessFrame.layout.addStretch(1)
 
         # Set fixed width for optionsFrame
-        # self.ProcessFrame.setFixedWidth(450)
         self.ProcessFrame.setFixedWidth(500)
 
         # Add options widgets to optionsFrame:
@@ -469,15 +540,18 @@ class CameraWidget (QWidget):
         field_drawer = Draw_SoccerField()
         soccer_field_image = field_drawer.generate_field()
 
+        # TEMP store it
+        self.field_image = soccer_field_image
+
         # soccer_field_pixmap = self.convert_cvimage_to_pixmap(soccer_field_image)
-        soccer_field_pixmap = self.imageToPixmap(soccer_field_image) ## Test
+        soccer_field_pixmap = self.imageToPixmap(soccer_field_image) 
 
         if soccer_field_pixmap:
              # Load the image using QPixmap
             pixmap = QPixmap(soccer_field_pixmap)
 
             # Load the image
-            #pixmap = cv2.imread(file_name)
+            # pixmap = cv2.imread(file_name)
             self.ProcessImage.setPixmap(pixmap)
             self.ProcessImage.setScaledContents(True) # needed or field wont fit
 
@@ -557,10 +631,11 @@ class CameraWidget (QWidget):
         qformat = QImage.Format_RGB888
         img = QImage(image, image.shape[1], image.shape[0] , image.strides[0], qformat)
         # img = img.rgbSwapped()  # BGR > RGB # not needed
+
         return QPixmap.fromImage(img)
     
     # Check def convert_cvimage)to_pixmap / def imageToPixmap (are they the same)
-    #def convert_cvimage_to_pixmap(self, image):
+    # def convert_cvimage_to_pixmap(self, image):
     #    height, width, channel = image.shape
     #    bytesPerLine = 3 * width
     #    qImg = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888)
@@ -681,7 +756,6 @@ class CameraWidget (QWidget):
             self.doneButton1.setText("Test Calibration")
             self.doneButton1.clicked.connect(self.test_calibration) # change connect to calibartion test
 
-    
     def perform_calibration(self):
         # Camera calibration to return calibration parameters (camera_matrix, distortion_coefficients)
         print("Start Calibration")
@@ -768,6 +842,7 @@ class CameraWidget (QWidget):
         objp = np.zeros((columns * rows, 3), np.float32)
         objp[:, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2)
         objp *= square_size
+
         return objp
     
     def test_calibration(self):
@@ -798,9 +873,12 @@ class CameraWidget (QWidget):
         if self.camera_matrix is not None and self.camera_dist_coeff is not None:
             # Undistort the frame using the camera matrix and distortion coefficients
             undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
+
             return undistorted_frame
+        
         else:
             print("No camera matrix or distortion coefficient detected, showing original frame")
+
             return frame
         
     def save_calibration(self):
@@ -846,8 +924,6 @@ class CameraWidget (QWidget):
             # Maybe via dialog box (TODO)
 
     # Below is mostly tab2 related to Perspective-Warp
-
-    # Add logic to select usb, image or network TODO
     
     # Slot function to enable or disable the "Load Image" button based on the radio button state
     def update_load_button_state(self):
@@ -897,23 +973,6 @@ class CameraWidget (QWidget):
 
         # Switch to the second tab (Perspective-Warp)
         self.tabs.setCurrentIndex(1)
-
-        #####################################
-        #   Next Piece of great code ...... #
-        #####################################
-
-        # For Testing 
-        # 1. Load image from R8 folder (1 camera view of 1/4 of the field)
-        #    Camera on spot in the Center Cirle (FCS 0,0) , center of the camera pointing to one corner 
-        # 2. Show Image and a Birds eye view of the Soccer field below with corresponding land marks to select 
-        # 3. Select 4 coordinates on Image that correspond to 4 landmarks on the birdseye view soccer field
-        #    2.0 (just outside the Center Cirle towards the side line)
-        #    6.0 ( Where the middle line meets the side line)
-        #    0.2 (just outside the Center Circle towards the goal)
-        #    0.6 (Penalty Spot)
-        # 4. Perform Perspective Warp and show output plotted on the Birdseye view.
-        # 5. Optimize landmark selection selections
-        # 6. Save to binairy cv mat file
 
         if self.image_dewarp == True:
             print("Starting image de-warp") #-> update status
@@ -997,7 +1056,64 @@ class CameraWidget (QWidget):
 
         self.imageFrame.mousePressEvent = self.mouse_click_event
 
+        # Starts a loop collecting points
         while True:
+            if len(self.points) == 0:
+                self.processoutputWindow.setText(f"Select the first landmark {landmark1}")
+                # Draw landmark 1
+                # print("Drawing landmark 1:", landmark1)
+                self.field_image = self.draw_landmark(self.field_image, FCS20)
+                
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+            
+            if len(self.points) == 1:
+                self.processoutputWindow.setText(f"Select the second landmark {landmark2}")
+                # Draw landmark 2
+                # print("Drawing landmark 2:", landmark2)
+                self.field_image = self.draw_landmark(self.field_image, FCS60)
+                
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+                
+            if len(self.points) == 2:
+                self.processoutputWindow.setText(f"Select the third landmark {landmark3}")
+                # Draw landmark 3
+                #print("Drawing landmark 3:", landmark3)
+                self.field_image = self.draw_landmark(self.field_image, FCS02)
+                
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+
+            if len(self.points) == 3:
+                self.processoutputWindow.setText(f"Select the last landmark {landmark4}")
+                # Draw landmark 4
+                # print("Drawing landmark 4:", landmark4)
+                self.field_image = self.draw_landmark(self.field_image, FCS06)
+                
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+
             if len(self.points) == 4:
                 break
             QApplication.processEvents()
@@ -1010,6 +1126,14 @@ class CameraWidget (QWidget):
         warper = Warper(points=self.points, width=self.cameraFrame.width, height=self.cameraFrame.height, supersample=self.supersample)
 
         return warper
+    
+    def draw_landmark(self, image, landmark):
+        # Draw the landmark
+        cv2.circle(image, landmark, 15, (red), -1)  # Red dot for landmark
+        cv2.putText(image, f"{landmark}", (landmark[0] + 20, landmark[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (green), 2, cv2.LINE_AA) # light green coords
+        
+        return image
+
 
     def display_dewarped_image(self, dewarped_frame):
         # Display the dewarped image
@@ -1038,10 +1162,6 @@ class CameraWidget (QWidget):
 
                 self.points.append((x, y))
                 self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
-
-                #bgimage = cv2.cvtColor(self.imageFrame.pixmap().toImage().bits(), cv2.COLOR_RGBA2RGB)
-                
-                #cv2.rectangle(bgimage, (x, y), (x + 2, y + 2), (0, 255, 0), 2)
                 bgimage = cv2.rectangle(self.cv_image, (x, y), (x + 2, y + 2), (0, 255, 0), 2)
                 self.display_image(bgimage)
             else:
@@ -1089,6 +1209,7 @@ class CamCalMain(QMainWindow):
         output_folder = "./output"
         if not os.path.exists(output_folder):
             QMessageBox.information(self, "Info", "The output folder does not exist.", QMessageBox.Ok)
+
             return
 
         # Check if there are existing images in the output folder
@@ -1113,6 +1234,7 @@ class CamCalMain(QMainWindow):
             else:
                 # If the user chooses not to delete, inform them and exit the method
                 QMessageBox.information(self, "Calibration Canceled", "Calibration process canceled.", QMessageBox.Ok)
+
                 return
 
     def load_calibration(self, filename):
@@ -1157,6 +1279,7 @@ class CamCalMain(QMainWindow):
             except FileNotFoundError:
                 print(f"File {filename} not found.")
                 self.camera_widget.update_status_signal.emit(f"File not found: {file_name}")
+
             except Exception as e:
                 print(f"Error loading calibration file: {e}")
                 self.camera_widget.update_status_signal.emit("Error loading calibration file")
