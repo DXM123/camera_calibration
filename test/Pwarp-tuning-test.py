@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import cv2
 import numpy as np
 
@@ -32,7 +31,7 @@ def mouse_click(event, x, y, flags, param):
 
 # Load the image
 img = cv2.imread('Test-Pwarp.jpg')
-assert img is not None, "file could not be read, check with os.path.exists()"
+assert img is not None, "file could not be read!"
 
 # Create a copy of the image for displaying selected points
 bgimage = img.copy()
@@ -53,6 +52,9 @@ while len(points) < 4:
     if key == 27:  # Press 'ESC' to exit if needed
         break
 
+# Print the selected points after mouse input
+print("Selected points:", points)
+
 # Allow adjustment of points with arrow keys
 while True:
     key = cv2.waitKey(0)
@@ -66,11 +68,20 @@ while True:
         # Update the transformation and display
         pts1 = np.float32(points)
         h, w, _ = img.shape
-        pts2 = np.float32([[0, 0], [w, 0], [0, h], [w, h]])
+
+        # Print the selected source points
+        # print("Source points (pts1):", pts1) 
+
+        # Calculate destination points to stretch the adjusted frame
+        pts2 = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+
+        # Print the defined destination points
+        # print("Destination points (pts2):", pts2)
+
         M = cv2.getPerspectiveTransform(pts1, pts2)
         dst = cv2.warpPerspective(img, M, (w, h))
 
-        # Display updated image with selected points
+        # Updated image with selected points
         cv2.imshow(adjusted_window_name, dst)
 
         # Update the selected point circle to red in the original frame
@@ -82,6 +93,8 @@ while True:
                 cv2.circle(bgimage, (point[0], point[1]), 5, (0, 255, 0), -1)
 
         cv2.imshow(window_name, bgimage)
+    
+    print("Adjusted points:", points)  # Print the adjusted points after each adjustment
 
 # Close all OpenCV windows
 cv2.destroyAllWindows()
