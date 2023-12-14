@@ -31,7 +31,7 @@ This Python application provides a user-friendly tool for camera calibration and
 
 - **Tuning and Enhancing Images:**
   - Fine-tune perspective warping parameters for optimal results.
-  - Advanced options for image adjustments and enhancements.
+  - Saving the results to binary file (TODO)
 
 ## Installation and Setup
 
@@ -61,8 +61,3 @@ Tested on Ubuntu 22.04 LTS
     chmod +x Falcons_DeWarp_BETA.py
     ./Falcons_DeWarp_BETA.py
     ```
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-4. Run the script (make executable first)
