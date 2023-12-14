@@ -235,7 +235,8 @@ class Warper(object):
             raise ValueError("Supersample should be a numerical value.")
 
         # Update self.pts2 with the FCS landmarks 2,0 6,0 0,2 0,6 
-        self.pts2 = np.float32([FCS02, FCS06, FCS20, FCS60])
+        # self.pts2 = np.float32([FCS02, FCS06, FCS60, FCS20]) # mirror
+        self.pts2 = np.float32([FCS20, FCS60, FCS06, FCS02]) # Odd order ofcourse but looks ok TODO
 
         print("self.pts2:", self.pts2)
 
@@ -259,25 +260,18 @@ class Warper(object):
         else:
             self.dst[:] = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
 
-        # unnecessarily complicated
+        # is this needed ??? TODO
         if supersample == 1:
             if out == None:
-
                 return self.dst
-            
             else:
                 out[:] = self.dst
-
                 return out
-            
         else:
             if out == None:
-
                 return cv2.resize(self.dst, (W,H), interpolation=self.interpolation)
-            
             else:
                 out[:] = cv2.resize(self.dst, (W,H), interpolation=self.interpolation)
-
                 return out
 
 ###############################################################
@@ -287,7 +281,7 @@ class CameraWidget (QWidget):
     update_status_signal = pyqtSignal(str)
 
     # Set the initial countdown time to save images
-    countdown_seconds = 2 # 3 seconds feels long
+    countdown_seconds = 3 # 3 seconds feels long
 
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
@@ -307,6 +301,7 @@ class CameraWidget (QWidget):
         self.image_dewarp = False # Track if an image is used for dewarping
         self.usb_dewarp = False # Track if an USB camera is used for dewarping
         self.network_dewarp = False # Track if an network stream is used for dewarping
+        self.image_tuning_dewarp = False # Track if an image tuning is used for dewarping
 
         # Need the camera object in this Widget
         self.cap = cv2.VideoCapture(0) # webcam object
@@ -334,6 +329,7 @@ class CameraWidget (QWidget):
 
         # Set variable to store selected objectpoint for dewarp
         self.points = []
+        self.selected_point = 0  # Index of the selected point for tuning dewarp
 
          # Add the supersample attribute
         self.supersample = 2 
@@ -345,8 +341,12 @@ class CameraWidget (QWidget):
 
         # Initialize tab screen
         self.tabs = QTabWidget()
+        #self.tabs.setFocusPolicy(Qt.ClickFocus)  # or Qt.StrongFocus
+        self.tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus) # TEST TODO
+
         self.tab1 = QWidget()
         self.tab2 = QWidget()
+        self.tab2.setFocusPolicy(Qt.FocusPolicy.StrongFocus) # TEST TODO
         self.tabs.resize(300, 200)
 
         # Add tabs
@@ -422,7 +422,6 @@ class CameraWidget (QWidget):
 
         # Add output Display (display at start is to small)
         self.outputWindowLabel = QLabel('Output Display:', self)
-        #self.outputWindow = QLineEdit()
         self.outputWindow = QTextEdit()
         self.outputWindow.setReadOnly(True)
 
@@ -447,7 +446,6 @@ class CameraWidget (QWidget):
 
         # Create Horizontal Box Layout for tab 2
         self.tab2.layout = QHBoxLayout(self.tab2)
-        #self.tab2.layout = QVBoxLayout(self.tab2)
 
         # Create Vertical Box Layout for tab1 inner frame
         self.tab2inner = QWidget()
@@ -461,7 +459,6 @@ class CameraWidget (QWidget):
 
         # Add Image Frame 
         self.imageFrame = QLabel("Image will be displayed here", self.tab2inner)
-        #self.imageFrame.mousePressEvent = self.getPos # Assign method not calling it with ()
 
         # Set word wrap to ensure text fits within the QLabel width
         self.imageFrame.setWordWrap(True)
@@ -469,6 +466,9 @@ class CameraWidget (QWidget):
         # Set alignment to center the text within the QLabel
         self.imageFrame.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
         self.imageFrame.setFrameShape(QFrame.Box)
+
+        # Set focus on ImageFrame to receive key events --> TEST TAB -> No Difference!! TODO
+        self.imageFrame.setFocusPolicy(Qt.StrongFocus)
         self.tab2inner.layout.addWidget(self.imageFrame)
 
         # Add Start De-warp Button last
@@ -543,15 +543,12 @@ class CameraWidget (QWidget):
         # TEMP store it
         self.field_image = soccer_field_image
 
-        # soccer_field_pixmap = self.convert_cvimage_to_pixmap(soccer_field_image)
+        # Convert to Pixmap
         soccer_field_pixmap = self.imageToPixmap(soccer_field_image) 
 
         if soccer_field_pixmap:
              # Load the image using QPixmap
             pixmap = QPixmap(soccer_field_pixmap)
-
-            # Load the image
-            # pixmap = cv2.imread(file_name)
             self.ProcessImage.setPixmap(pixmap)
             self.ProcessImage.setScaledContents(True) # needed or field wont fit
 
@@ -566,7 +563,6 @@ class CameraWidget (QWidget):
         
         # Add process Output Display (display at start is to small)
         self.processOutputWindowLabel = QLabel('Output Display:', self)
-        #self.processOutputWindow = QLineEdit()
         self.processoutputWindow = QTextEdit()
         self.processoutputWindow.setReadOnly(True)
 
@@ -602,7 +598,7 @@ class CameraWidget (QWidget):
             square_size = float(self.squareSizeRow.text())
 
             # Start the timer when the button is clicked
-            self.timer.start(100)  # Set the interval in milliseconds (e.g., 100 milliseconds)
+            self.timer.start(100)  # Set the interval in milliseconds (e.g. 100 milliseconds)
             
             # Update button text
             self.captureButton1.setText("Pauze Capture")
@@ -630,16 +626,17 @@ class CameraWidget (QWidget):
     def imageToPixmap(self, image):
         qformat = QImage.Format_RGB888
         img = QImage(image, image.shape[1], image.shape[0] , image.strides[0], qformat)
-        # img = img.rgbSwapped()  # BGR > RGB # not needed
+        #img = img.rgbSwapped()  # BGR > RGB # needed for camera feed
 
         return QPixmap.fromImage(img)
     
     # Check def convert_cvimage)to_pixmap / def imageToPixmap (are they the same)
-    # def convert_cvimage_to_pixmap(self, image):
-    #    height, width, channel = image.shape
-    #    bytesPerLine = 3 * width
-    #    qImg = QImage(image.data, width, height, bytesPerLine, QImage.Format_RGB888)
-    #    return QPixmap.fromImage(qImg)
+    def CameraToPixmap(self, image):
+        qformat = QImage.Format_RGB888
+        img = QImage(image, image.shape[1], image.shape[0] , image.strides[0], qformat)
+        img = img.rgbSwapped()  # BGR > RGB # needed for camera feed
+
+        return QPixmap.fromImage(img)
     
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
@@ -667,11 +664,11 @@ class CameraWidget (QWidget):
 
                 if ret_corners:
                     # Display the frame with corners
-                    self.pixmap = self.imageToPixmap(frame_with_corners)
-                    self.cameraFrame.setPixmap(self.pixmap)
+                    self.pixmap = self.CameraToPixmap(frame_with_corners)
+                    #self.cameraFrame.setPixmap(self.pixmap)
                 else:
                     # Display the original frame
-                    self.pixmap = self.imageToPixmap(frame_inverted)
+                    self.pixmap = self.CameraToPixmap(frame_inverted)
                     self.cameraFrame.setPixmap(self.pixmap)
 
             # Ensure the image does not scales with the label -> issue with aspect ratio TODO
@@ -856,7 +853,7 @@ class CameraWidget (QWidget):
         self.test_started = True
 
         # Start update_camera_feed again
-        self.timer.start(100) # Start camera feed (is based on timer)
+        self.timer.start(100) # Start camera feed
 
         if self.cal_imported == False:
             # Update DONE button to Test Calibration
@@ -921,8 +918,6 @@ class CameraWidget (QWidget):
             print(f"Error saving calibration file: {e}")
             self.update_status_signal.emit("Error saving calibration file")
 
-            # Maybe via dialog box (TODO)
-
     # Below is mostly tab2 related to Perspective-Warp
     
     # Slot function to enable or disable the "Load Image" button based on the radio button state
@@ -939,18 +934,14 @@ class CameraWidget (QWidget):
             self, "Open Image File", "", "Image Files (*.png *.jpg *.bmp);;All Files (*)", options=options
         )
         if file_name:
-            # Load the image using QPixmap
-            # pixmap = QPixmap(file_name)
-
             # Set image Dewarp to True
-            self.image_dewarp = True
+            self.image_dewarp = True # TODO Does not below here
 
             # Load the image using OpenCv
             self.cv_image = cv2.imread(file_name)
             self.cv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_RGB2BGR)
 
             # Covert to Pixmap
-            # pixmap = self.convert_cvimage_to_pixmap(self.cv_image)
             pixmap = self.imageToPixmap(self.cv_image) ## Test
 
             # Show stuff
@@ -962,38 +953,28 @@ class CameraWidget (QWidget):
     def start_pwarp(self):       
 
         # Stop Camera
-        self.timer.stop()
-
-        # Emit the signal with the updated status text
-        print("Starting Perspective-Warp")
-        self.update_status_signal.emit("Perspective Warp started")
+        self.timer.stop() # Should not be here !
 
         # Temp disable Start button untill all 4 points are collected TODO
-        # self.startButtonPwarp.setText("Select the Landmarks before proceeding")
-        self.startButtonPwarp.setDisabled(True)
+        self.startButtonPwarp.setDisabled(True) # Should not be here !
 
         # Disable the first tab (Camera Calibration)
-        self.tabs.setTabEnabled(0, False)
+        self.tabs.setTabEnabled(0, False) # Should not be here !
 
         # Switch to the second tab (Perspective-Warp)
-        self.tabs.setCurrentIndex(1)
+        self.tabs.setCurrentIndex(1) # Should not be here !
 
         if self.image_dewarp == True:
-            print("Starting image de-warp") #-> update status         
-
-            # Use the loaded image directly
-            # pixmap = self.imageFrame.pixmap()
-
-            # image = pixmap.toImage()
-            # cv_frame = np.array(image.rgbSwapped())  # Convert to NumPy array
+            print("Image Perspective Warp started")
+            self.update_status_signal.emit("Image Perspective Warp started")         
 
             frame = self.cv_image
 
             # Check if 'frame' is a valid NumPy array
             if isinstance(frame, np.ndarray):
 
-                # Disable Load image Button when import succeeded and dearp started
-                self.loadImage.setDisabled(True)  # LoadImage / load_image confusing
+                # Disable Load image Button when import succeeded and dewarp started
+                self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
 
                 if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
 
@@ -1012,17 +993,18 @@ class CameraWidget (QWidget):
                     print("Dewarping process completed.")
                     self.update_status_signal.emit("Dewarping process completed.")
 
-                    # Emit the signal with the updated status text - TODO Ask for tweaking
-                    # QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
-
                     # Update button text for next step
+                    self.startButtonPwarp.setText("Tweak Landmarks")
+
+                    # Need this later
                     #self.startButtonPwarp.setText("DONE")
                     #self.startButtonPwarp.clicked.connect(self.close_application) # close when done
-                    self.startButtonPwarp.setText("Tweak Landmarks")
                     
                     # TODO next steps - Tweak landmarks
                     self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
-                    self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
+
+                    if self.image_tuning_dewarp == False:
+                        self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
 
                 else:
                     print("Invalid frame format: Not a 3D array (color image)")
@@ -1051,30 +1033,37 @@ class CameraWidget (QWidget):
         elif self.network_dewarp == True:
             #network_dewarp()
             print("Starting network de-warp") #-> update status
-    
-    def tweak_pwarp(self):
-        # Print new instruction
-        self.processoutputWindow.setText(f"Tweaks landmark {landmark1}")
-
-        # TODO
-
-    def close_application(self):
-        QApplication.quit()
 
     def dewarp(self, img):
-        bgimage = img.copy()
-        self.display_image(bgimage)
 
-        self.imageFrame.mousePressEvent = self.mouse_click_event
+        # Add check if Tuning is started TODO
+        bgimage = img.copy()
+        self.display_landmarks(bgimage)
+
+        # Added Check to see it tuning is started to either capture mouse events of arrow keys while tuning
+        if self.image_tuning_dewarp == False:
+            print("Landmark collection is started")
+
+            # Start collecting landmarks with mouse clicks
+            self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
+
+        if self.image_tuning_dewarp == True:
+            print("Perspective Tuning is started")
+
+            # Stop mouse press event registration
+            self.imageFrame.mousePressEvent = None
+
+            # Start collecting arrow key events --> TEST TODO Ths is not the correct way
+            self.imageFrame.keyPressEvent = self.keypress_tuning_event
 
         # Starts a loop collecting points
         while True:
             if len(self.points) == 0:
                 self.processoutputWindow.setText(f"Select the first landmark {landmark1}")
-                # Draw landmark 1
+                # Draw landmark 1 on 2d field view
                 # print("Drawing landmark 1:", landmark1)
                 self.field_image = self.draw_landmark(self.field_image, FCS20)
-                
+                    
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
                 pixmap = QPixmap(self.pixmap)
@@ -1082,13 +1071,13 @@ class CameraWidget (QWidget):
                 #Load the image
                 self.ProcessImage.setPixmap(pixmap)
                 self.ProcessImage.setScaledContents(True)
-            
+                
             if len(self.points) == 1:
                 self.processoutputWindow.setText(f"Select the second landmark {landmark2}")
-                # Draw landmark 2
+                # Draw landmark 2 on 2d field view
                 # print("Drawing landmark 2:", landmark2)
                 self.field_image = self.draw_landmark(self.field_image, FCS60)
-                
+                    
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
                 pixmap = QPixmap(self.pixmap)
@@ -1096,13 +1085,13 @@ class CameraWidget (QWidget):
                 #Load the image
                 self.ProcessImage.setPixmap(pixmap)
                 self.ProcessImage.setScaledContents(True)
-                
+                    
             if len(self.points) == 2:
                 self.processoutputWindow.setText(f"Select the third landmark {landmark3}")
-                # Draw landmark 3
+                # Draw landmark 3 on 2d field view
                 #print("Drawing landmark 3:", landmark3)
                 self.field_image = self.draw_landmark(self.field_image, FCS02)
-                
+                    
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
                 pixmap = QPixmap(self.pixmap)
@@ -1113,10 +1102,10 @@ class CameraWidget (QWidget):
 
             if len(self.points) == 3:
                 self.processoutputWindow.setText(f"Select the last landmark {landmark4}")
-                # Draw landmark 4
+                # Draw landmark 4 on 2d field view
                 # print("Drawing landmark 4:", landmark4)
                 self.field_image = self.draw_landmark(self.field_image, FCS06)
-                
+                    
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
                 pixmap = QPixmap(self.pixmap)
@@ -1127,45 +1116,66 @@ class CameraWidget (QWidget):
 
             if len(self.points) == 4:
 
-                # Temp Enable Start button again when all 4 points are collected TODO
-                # self.startButtonPwarp.setText("Select the Landmarks before proceeding")
+                # Enable Start button again when all 4 points are collected
                 self.startButtonPwarp.setDisabled(False)
+
+                if self.image_tuning_dewarp == True:
+                    # tune self.point before processing them when tuning is enabled
+                    print("Start tuning landmarks")
+                    print(f"Tuning the selected Landmark: {self.points}")
+                    self.processoutputWindow.setText(f"Tuning selected Landmarks" )
+
+                    # TODO - need a way to update image on key event
+
+                    self.startButtonPwarp.setText("Click when done tuning")
+                    self.startButtonPwarp.clicked.connect(self.stop_tuning)
 
                 break
 
             QApplication.processEvents()
 
-        print(f"Check 1 self | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
-        print(f"Check 1 cameraFrame| W: {self.cameraFrame.width()}, H: {self.cameraFrame.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
+        print(f"Check UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
+        print(f"Check cameraFrame| W: {self.cameraFrame.width()}, H: {self.cameraFrame.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
 
-        # TODO set correct height and width here
-        # warper = Warper(points=self.points, width=self.width, height=self.height, supersample=self.supersample)
+        # TODO is CameraFrame the best option?
         warper = Warper(points=self.points, width=self.cameraFrame.width, height=self.cameraFrame.height, supersample=self.supersample)
 
         return warper
     
+    def stop_tuning(self):
+        self.image_tuning_dewarp == False
+    
     def draw_landmark(self, image, landmark):
+
+        # TEMP Set color based on stage -> Probably not needed
+        if self.image_tuning_dewarp == True:
+            color = pink
+        else:
+            color = red
+
         # Draw the landmark
-        cv2.circle(image, landmark, 15, (red), -1)  # Red dot for landmark
-        cv2.putText(image, f"{landmark}", (landmark[0] + 20, landmark[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (green), 2, cv2.LINE_AA) # light green coords
+        cv2.circle(image, landmark, 15, (color), -1)  # Red dot for landmark
+        cv2.putText(image, f"{landmark}", (landmark[0] + 20, landmark[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (lightgreen), 2, cv2.LINE_AA) # light green coords
         
         return image
+    
+    # Different way to display dewarped image and image landmark 
 
     def display_dewarped_image(self, dewarped_frame):
         # Display the dewarped image
         dewarped_pixmap = self.imageToPixmap(dewarped_frame)
         self.imageFrame.setPixmap(dewarped_pixmap)
         self.imageFrame.setScaledContents(True)
-        QMessageBox.information(self, "Dewarping Complete", "Dewarping process completed.", QMessageBox.Ok)
 
-    def display_image(self, image):
+    def display_landmarks(self, image):
         height, width, channel = image.shape
         bytes_per_line = 3 * width
         q_image = QImage(image.data, width, height, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(q_image)
         self.imageFrame.setPixmap(pixmap)
 
-    def mouse_click_event(self, event):
+    # To Capture landmarks with mouse clicks
+    def mouse_click_landmark_event(self, event):
         if event.button() == Qt.LeftButton:
             x = event.x()
             y = event.y()
@@ -1178,10 +1188,129 @@ class CameraWidget (QWidget):
 
                 self.points.append((x, y))
                 self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
-                bgimage = cv2.rectangle(self.cv_image, (x, y), (x + 2, y + 2), (0, 255, 0), 2)
-                self.display_image(bgimage)
+                bgimage = cv2.rectangle(self.cv_image, (x, y), (x + 2, y + 2), (green), 2)
+                self.display_landmarks(bgimage)
             else:
                 print("Pixmap is not set")
+
+    def keypress_tuning_event(self, event):
+        if len(self.points) == 4:  # Ensure 4 points are selected
+            if event.key() == Qt.Key_Up:
+                self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'up')
+                print("Moved point up")
+            elif event.key() == Qt.Key_Down:
+                self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'down')
+                print("Moved point down")
+            elif event.key() == Qt.Key_Left:
+                self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'left')
+                print("Moved point left")
+            elif event.key() == Qt.Key_Right:
+                self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'right')
+                print("Moved point right")
+            #elif event.key() == Qt.Key_Tab:
+
+                # TODO Tab does not stay in the frame                
+            #    print(f"Before Tab update: {self.selected_point}")
+
+            #    self.selected_point = (self.selected_point + 1) % 4
+
+            #    print(f"After Tab update: {self.selected_point}")
+            #    print("Switched to the next point")
+
+            #    event.accept()  # Accept the event to prevent default tab 
+            elif event.key() == Qt.Key_1:
+                self.selected_point = 0
+                print("Selected landmark 1")
+            elif event.key() == Qt.Key_2:
+                self.selected_point = 1
+                print("Selected landmark 2")
+            elif event.key() == Qt.Key_3:
+                self.selected_point = 2
+                print("Selected landmark 3")
+            elif event.key() == Qt.Key_4:
+                self.selected_point = 3
+                print("Selected landmark 4")
+
+            else:
+                super().keyPressEvent(event)  # Pass other key events to the base class
+
+            # Make rectangle red when selected
+            print(f"Updating perspective transform, using: self.points (pts{self.selected_point}): {self.points}")
+
+            # Check if the pixmap is set on the Image Frane
+            if self.imageFrame.pixmap() is not None:
+
+                # TODO update selected point -> update perspective warp
+                print("Update Image Frame / PWarp view")
+
+                # Perform pwarp at every key press
+                self.warper_result = self.dewarp(self.cv_image) # return warper
+
+                # Apply camera correction if any set
+                undistorted_frame = self.undistort_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)
+
+                # Perform dewarping
+                dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
+
+                # Update the display with the dewarped image
+                self.display_dewarped_image(dewarped_frame)
+                    
+            else:
+                print("Pixmap is not set")
+
+    def adjust_point(self, point, direction):
+        """ Adjust the point based on arrow key input """
+        x, y = point
+        if direction == 'up':
+            return (x, y - 1)
+        elif direction == 'down':
+            return (x, y + 1)
+        elif direction == 'left':
+            return (x - 1, y)
+        elif direction == 'right':
+            return (x + 1, y)
+        return point
+    
+    # do i need this or can i use display_dewarped_image again
+    def update_perspective_transform(self, pts1, pts2):
+        
+        self.frame = self.cv_image
+
+         # Call the height and width method to get the actual value of the frame
+        W = self.cameraFrame.width() # is it cheating to use frame instead of img?
+        H = self.cameraFrame.height()
+
+        # Update and display the perspective-transformed image
+        self.pts1 = np.float32(pts1)
+        self.pts2 = np.float32(pts2)
+
+        M = cv2.getPerspectiveTransform(self.pts1, self.pts2)
+
+        supersample = self.supersample
+
+        if self.frame is None:
+            self.frame = cv2.warpPerspective(self.frame,M,(W*supersample,H*supersample))
+        else:
+            self.frame[:] = cv2.warpPerspective(self.frame,M,(W*supersample,H*supersample))  # -> issue using from frame.shape-
+        
+        # Convert the adjusted image to QPixmap and display it
+        self.display_landmarks(self.frame) # TODO
+
+
+    def tweak_pwarp(self):
+
+        #frame = self.cv_image
+        # Print new instruction
+        self.processoutputWindow.setText("Tuning Landmarks started")
+
+        # Add check if Tuning is started TODO
+        self.image_tuning_dewarp = True # Track if an image tuning is used for dewarping
+
+        # Start de warp again for tuning
+        self.start_pwarp()
+
+    def close_application(self):
+        QApplication.quit()
             
 
 class CamCalMain(QMainWindow):
