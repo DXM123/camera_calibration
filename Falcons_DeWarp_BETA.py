@@ -1051,7 +1051,7 @@ class CameraWidget (QWidget):
             print("Perspective Tuning is started")
 
             # Stop mouse press event registration
-            self.imageFrame.mousePressEvent = None
+            #self.imageFrame.mousePressEvent = None # disable sooner
 
             # Start collecting arrow key events --> TEST TODO Ths is not the correct way
             self.imageFrame.keyPressEvent = self.keypress_tuning_event
@@ -1119,13 +1119,18 @@ class CameraWidget (QWidget):
                 # Enable Start button again when all 4 points are collected
                 self.startButtonPwarp.setDisabled(False)
 
+                # Stop mouse press event registration
+                self.imageFrame.mousePressEvent = None
+
+                # Now tuning is not starting TODO
+
                 if self.image_tuning_dewarp == True:
                     # tune self.point before processing them when tuning is enabled
-                    print("Start tuning landmarks")
-                    print(f"Tuning the selected Landmark: {self.points}")
-                    self.processoutputWindow.setText(f"Tuning selected Landmarks" )
+                    #print("Start tuning landmarks")
+                    #print(f"Tuning the selected Landmark: {self.points}")
+                    #self.processoutputWindow.setText(f"Tuning selected Landmarks" ) # Keeps overwritting output display
 
-                    # TODO - need a way to update image on key event
+                    # TODO - Move this part
 
                     self.startButtonPwarp.setText("Click when done tuning")
                     self.startButtonPwarp.clicked.connect(self.stop_tuning)
@@ -1193,20 +1198,22 @@ class CameraWidget (QWidget):
             else:
                 print("Pixmap is not set")
 
+    # Define keypress events for tuning landmarks
+    # TODO Print statements and Output display not showing (beeing overwritten by Tuning Selected Landmarks)
     def keypress_tuning_event(self, event):
         if len(self.points) == 4:  # Ensure 4 points are selected
             if event.key() == Qt.Key_Up:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'up')
-                print("Moved point up")
+                #print("Moved point up")
             elif event.key() == Qt.Key_Down:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'down')
-                print("Moved point down")
+                #print("Moved point down")
             elif event.key() == Qt.Key_Left:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'left')
-                print("Moved point left")
+                #print("Moved point left")
             elif event.key() == Qt.Key_Right:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'right')
-                print("Moved point right")
+                #print("Moved point right")
             #elif event.key() == Qt.Key_Tab:
 
                 # TODO Tab does not stay in the frame                
@@ -1221,16 +1228,19 @@ class CameraWidget (QWidget):
             elif event.key() == Qt.Key_1:
                 self.selected_point = 0
                 print("Selected landmark 1")
+                self.processoutputWindow.setText(f"Selected landmark 1" )
             elif event.key() == Qt.Key_2:
                 self.selected_point = 1
                 print("Selected landmark 2")
+                self.processoutputWindow.setText(f"Selected landmark 2" )
             elif event.key() == Qt.Key_3:
                 self.selected_point = 2
                 print("Selected landmark 3")
+                self.processoutputWindow.setText(f"Selected landmark 3" )
             elif event.key() == Qt.Key_4:
                 self.selected_point = 3
                 print("Selected landmark 4")
-
+                self.processoutputWindow.setText(f"Selected landmark 4" )
             else:
                 super().keyPressEvent(event)  # Pass other key events to the base class
 
@@ -1243,7 +1253,7 @@ class CameraWidget (QWidget):
                 # TODO update selected point -> update perspective warp
                 print("Update Image Frame / PWarp view")
 
-                # Perform pwarp at every key press
+                # Perform pwarp at every key press to update frame
                 self.warper_result = self.dewarp(self.cv_image) # return warper
 
                 # Apply camera correction if any set
@@ -1262,12 +1272,16 @@ class CameraWidget (QWidget):
         """ Adjust the point based on arrow key input """
         x, y = point
         if direction == 'up':
+            print("Moved point up")
             return (x, y - 1)
         elif direction == 'down':
+            print("Moved point down")
             return (x, y + 1)
         elif direction == 'left':
+            print("Moved point left")
             return (x - 1, y)
         elif direction == 'right':
+            print("Moved point right")
             return (x + 1, y)
         return point
     
@@ -1301,7 +1315,7 @@ class CameraWidget (QWidget):
 
         #frame = self.cv_image
         # Print new instruction
-        self.processoutputWindow.setText("Tuning Landmarks started")
+        # self.processoutputWindow.setText("Tuning Landmarks started")
 
         # Add check if Tuning is started TODO
         self.image_tuning_dewarp = True # Track if an image tuning is used for dewarping
