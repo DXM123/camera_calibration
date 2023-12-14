@@ -7,45 +7,60 @@ This Python application provides a user-friendly tool for camera calibration and
 ## Features
 
 - **Camera Calibration Tab:**
-  - Capture images of a checkerboard pattern for camera calibration.
-  - Set the number of columns, rows, and square size of the checkerboard.
-  - Live camera feed with detected corners during calibration.
-  - Save captured images with detected corners for later calibration.
+  - Capture checkerboard pattern images for precise camera calibration.
+  - Adjustable settings for checkerboard dimensions (columns, rows, square size).
+  - Real-time camera feed displaying detected checkerboard corners.
+  - Option to save images with detected corners for subsequent calibration.
 
 - **Calibration Process:**
-  - Detect corners in calibration images for camera calibration.
-  - Display and save calibration results, including camera matrix and distortion coefficients.
+  - Automated detection of corners in calibration images.
+  - Visualization and saving of calibration results, including the camera matrix and distortion coefficients.
 
-- **Testing Calibration:**
-  - Test the calibration by applying it to the live camera feed.
-  - Save calibration parameters to a file.
- 
-- **Save Calibration:**
-  - Save calibration parameters to a JSON file.
-  - Can be imported again.
+- **Testing and Saving Calibration:**
+  - Apply calibration to a live camera feed for immediate feedback.
+  - Persist calibration parameters as a JSON file for future use.
 
-- **Import Calibration:**
-  - Import calibration parameters from a JSON file.
-  - Use imported parameters for testing without recalibration.
- 
-- **Perspective-Warp Tab (TODO):**
-  - Load an image for perspective correction (warping).
-  - Display the loaded image.
-  - Initiate perspective-warp process.
+- **Importing Calibration Data:**
+  - Import existing calibration parameters from a JSON file.
+  - Apply previously saved calibration data, bypassing the need for recalibration.
 
-## How to Use - Tested on Ubuntu 22.04 LTS
+- **Perspective Warping Functionality:**
+  - Load images for perspective correction.
+  - Interactive selection of landmarks for perspective transformation.
+  - Live preview of perspective-corrected images.
+
+- **Tuning and Enhancing Images:**
+  - Fine-tune perspective warping parameters for optimal results.
+  - Advanced options for image adjustments and enhancements.
+
+## Installation and Setup
+
+Tested on Ubuntu 22.04 LTS
 
 1. Clone the repository:
 
     ```bash
     git clone https://github.com/DXM123/camera_calibration.git
     ```
-2. Make sure opencv is availble. You can install it with
+
+2. Ensure OpenCV is installed. If not, install it using:
 
     ```bash
     sudo apt-get install python3-opencv
     ```
-    and install other requirements (`numpy` and `PyQt5`) with
+
+3. Install other required packages (`numpy` and `PyQt5`):
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. Run the script. Make sure it is executable:
+
+    ```bash
+    chmod +x Falcons_DeWarp_BETA.py
+    ./Falcons_DeWarp_BETA.py
+    ```
 
     ```bash
     pip install -r requirements.txt
