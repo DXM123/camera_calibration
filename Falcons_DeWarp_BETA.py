@@ -80,51 +80,31 @@ magenta = (255, 0, 255)
 # For 18 x 12 meter Field
 # Landmark 1, where the middle circle meets the middle line
 landmark1 = (2,0)
-
 # Landmark 2, where the middle line meets the outer field line
 landmark2 = (6,0) # field_width / 2, 0
-
 # Landmark 3, from the center circle spot towards the goal, where the (fictive) line meets the center circle line
 landmark3 = (0,2) # 0, center_circle_radius
-
 # # Landmark 4, Penalty Spot
 landmark4 = (0,6) # 0, field_lenght / 2 - penalty_spot (3)
 
 # Center Spot 0,0 FCS
 FCS0 = (int(field_length_total / 2) * ppm, int(field_width_total / 2) * ppm )
-#print(f"FCS 0,0 {FCS0}")
-
 # Marker Spot 0,2 FCS
 FCS02 = (int((field_length_total / 2) * ppm) - int(2 * ppm), int(field_width_total / 2) * ppm )
-#print(f"FCS 0,2 {FCS02}")
-
 # Marker Spot 0,6 FCS - Penalty spot left
 FCS06 = (int((field_length_total / 2) * ppm) - int(6 * ppm), int(field_width_total / 2) * ppm )
-#print(f"FCS 0,6 {FCS06}")
-
 # Marker Spot 2,0 FCS
 FCS20 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - int(2 * ppm))
-#print(f"FCS 2,0 {FCS20}")
-
 # Marker Spot 6,0 FCS
 FCS60 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - int(6 * ppm))
-#print(f"FCS 6,0 {FCS60}")
-
 # Marker Spot -2,0 FCS
 FCSmin20 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) + (2 * ppm))
-#print(f"FCS -2,0 {FCSmin20}")
-
 # Marker Spot -6,0 FCS
 FCSmin60 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) + (6 * ppm))
-#print(f"FCS -6,0 {FCSmin60}")
-
 # Marker Spot 0,-2 FCS
 FCS0min2 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - (2 * ppm))
-#print(f"FCS 0,-2 {FCS0min2}")
-
 # Marker Spot 0,-6 FCS
 FCS0min6 = (int(field_length_total / 2) * ppm, int((field_width_total / 2) * ppm) - (6 * ppm))
-#print(f"FCS 0,-6 {FCS0min6}")
 
 ################## Field Drawing Class ####################
 
@@ -1053,7 +1033,7 @@ class CameraWidget (QWidget):
             # Stop mouse press event registration
             #self.imageFrame.mousePressEvent = None # disable sooner
 
-            # Start collecting arrow key events --> TEST TODO Ths is not the correct way
+            # Start collecting arrow key events
             self.imageFrame.keyPressEvent = self.keypress_tuning_event
 
         # Starts a loop collecting points
@@ -1204,27 +1184,12 @@ class CameraWidget (QWidget):
         if len(self.points) == 4:  # Ensure 4 points are selected
             if event.key() == Qt.Key_Up:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'up')
-                #print("Moved point up")
             elif event.key() == Qt.Key_Down:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'down')
-                #print("Moved point down")
             elif event.key() == Qt.Key_Left:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'left')
-                #print("Moved point left")
             elif event.key() == Qt.Key_Right:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'right')
-                #print("Moved point right")
-            #elif event.key() == Qt.Key_Tab:
-
-                # TODO Tab does not stay in the frame                
-            #    print(f"Before Tab update: {self.selected_point}")
-
-            #    self.selected_point = (self.selected_point + 1) % 4
-
-            #    print(f"After Tab update: {self.selected_point}")
-            #    print("Switched to the next point")
-
-            #    event.accept()  # Accept the event to prevent default tab 
             elif event.key() == Qt.Key_1:
                 self.selected_point = 0
                 print("Selected landmark 1")
@@ -1312,10 +1277,6 @@ class CameraWidget (QWidget):
 
 
     def tweak_pwarp(self):
-
-        #frame = self.cv_image
-        # Print new instruction
-        # self.processoutputWindow.setText("Tuning Landmarks started")
 
         # Add check if Tuning is started TODO
         self.image_tuning_dewarp = True # Track if an image tuning is used for dewarping
