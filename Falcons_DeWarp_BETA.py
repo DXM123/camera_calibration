@@ -77,6 +77,14 @@ lightblue = (173, 216, 230)
 pink = (255, 192, 203)
 magenta = (255, 0, 255)
 
+# Colors that standout on green background
+yellow = (255, 255, 0)
+orange = (255, 165, 0)
+cyan = (0, 255, 255)
+purple = (128, 0, 128)
+hot_pink = (255, 105, 180)
+gold = (255, 215, 0)
+
 # For 18 x 12 meter Field
 # Landmark 1, where the middle circle meets the middle line
 landmark1 = (2,0)
@@ -227,6 +235,7 @@ class Warper(object):
 
         # Update self.pts2 with the FCS landmarks 2,0 6,0 0,2 0,6 
         # self.pts2 = np.float32([FCS02, FCS06, FCS60, FCS20]) # mirror
+        # Need to be global? Now have to add same to CameraWidget Class TODO
         self.pts2 = np.float32([FCS20, FCS60, FCS06, FCS02]) # Odd order ofcourse but looks ok TODO
 
         print("self.pts2:", self.pts2)
@@ -321,6 +330,10 @@ class CameraWidget (QWidget):
         # Set variable to store selected objectpoint for dewarp
         self.points = []
         self.selected_point = 0  # Index of the selected point for tuning dewarp
+        
+        #self.pts2 = []
+        # Also part of Warper Class
+        self.pts2 = np.float32([FCS20, FCS60, FCS06, FCS02]) # Odd order ofcourse but looks ok TODO
 
          # Add the supersample attribute
         self.supersample = 2 
@@ -1053,7 +1066,7 @@ class CameraWidget (QWidget):
                 self.processoutputWindow.setText(f"Select the first landmark {landmark1}")
                 # Draw landmark 1 on 2d field view
                 # print("Drawing landmark 1:", landmark1)
-                self.field_image = self.draw_landmark(self.field_image, FCS20)
+                self.field_image = self.draw_landmark(self.field_image, FCS20, red)
                     
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
@@ -1067,7 +1080,7 @@ class CameraWidget (QWidget):
                 self.processoutputWindow.setText(f"Select the second landmark {landmark2}")
                 # Draw landmark 2 on 2d field view
                 # print("Drawing landmark 2:", landmark2)
-                self.field_image = self.draw_landmark(self.field_image, FCS60)
+                self.field_image = self.draw_landmark(self.field_image, FCS60, red)
                     
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
@@ -1081,7 +1094,7 @@ class CameraWidget (QWidget):
                 self.processoutputWindow.setText(f"Select the third landmark {landmark3}")
                 # Draw landmark 3 on 2d field view
                 #print("Drawing landmark 3:", landmark3)
-                self.field_image = self.draw_landmark(self.field_image, FCS02)
+                self.field_image = self.draw_landmark(self.field_image, FCS02, red)
                     
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
@@ -1095,7 +1108,7 @@ class CameraWidget (QWidget):
                 self.processoutputWindow.setText(f"Select the last landmark {landmark4}")
                 # Draw landmark 4 on 2d field view
                 # print("Drawing landmark 4:", landmark4)
-                self.field_image = self.draw_landmark(self.field_image, FCS06)
+                self.field_image = self.draw_landmark(self.field_image, FCS06, red)
                     
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
@@ -1112,13 +1125,14 @@ class CameraWidget (QWidget):
                 
                 # Stop mouse press event registration
                 self.imageFrame.mousePressEvent = None
+
                 if self.image_tuning_dewarp == True:
                     # tune self.point before processing them when tuning is enabled
                     #print("Start tuning landmarks")
                     #print(f"Tuning the selected Landmark: {self.points}")
                     #self.processoutputWindow.setText(f"Tuning selected Landmarks" )
 
-                    # TODO - need a way to update image on key event
+                    # TODO - need a way to update field image on key event
 
                     self.startButtonPwarp.setText("Click when done tuning")
                     self.startButtonPwarp.clicked.connect(self.stop_tuning)
@@ -1138,17 +1152,20 @@ class CameraWidget (QWidget):
     def stop_tuning(self):
         self.image_tuning_dewarp == False
     
-    def draw_landmark(self, image, landmark):
-
-        # TEMP Set color based on stage -> Probably not needed
-        if self.image_tuning_dewarp == True:
-            color = pink
-        else:
-            color = red
-
+    def draw_landmark(self, image, landmark, color):
         # Draw the landmark
         cv2.circle(image, landmark, 15, (color), -1)  # Red dot for landmark
         cv2.putText(image, f"{landmark}", (landmark[0] + 20, landmark[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (lightgreen), 2, cv2.LINE_AA) # light green coords
+        
+        return image
+    
+    def draw_landmark_selected(self, image, landmark, color):
+
+        # Convert landmark to a tuple of integers
+        landmark = (int(landmark[0]), int(landmark[1]))
+
+        # Draw the landmark selector
+        cv2.circle(image, landmark, 30, (color), 3)  # Meganta circle for landmark selection while tuning
         
         return image
     
@@ -1190,43 +1207,103 @@ class CameraWidget (QWidget):
         if len(self.points) == 4:  # Ensure 4 points are selected
             if event.key() == Qt.Key_Up:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'up')
-                #print("Moved point up")
             elif event.key() == Qt.Key_Down:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'down')
-                #print("Moved point down")
             elif event.key() == Qt.Key_Left:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'left')
-                #print("Moved point left")
             elif event.key() == Qt.Key_Right:
                 self.points[self.selected_point] = self.adjust_point(self.points[self.selected_point], 'right')
-                #print("Moved point right")
-            #elif event.key() == Qt.Key_Tab:
-
-                # TODO Tab does not stay in the frame                
-            #    print(f"Before Tab update: {self.selected_point}")
-
-            #    self.selected_point = (self.selected_point + 1) % 4
-
-            #    print(f"After Tab update: {self.selected_point}")
-            #    print("Switched to the next point")
-
-            #    event.accept()  # Accept the event to prevent default tab 
             elif event.key() == Qt.Key_1:
                 self.selected_point = 0
                 print("Selected landmark 1")
-                self.processoutputWindow.setText(f"Selected landmark 1" )
+                self.processoutputWindow.setText(f"Landmark 1 selected" )
+
+                #print(f"Selected point index: {self.selected_point}")
+                #print(f"self.pts2: {self.pts2}")
+                #print(f"Value at selected point: {self.pts2[self.selected_point]}")
+
+                # Draw selector on field image
+                self.field_image_selected = self.draw_landmark_selected(self.field_image.copy(), self.pts2[self.selected_point], yellow)
+
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image_selected)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+
+                # Cleanup
+                self.field_image_selected = None
+
             elif event.key() == Qt.Key_2:
                 self.selected_point = 1
                 print("Selected landmark 2")
-                self.processoutputWindow.setText(f"Selected landmark 2" )
+                self.processoutputWindow.setText(f"Landmark 2 selected" )
+
+                #print(f"Selected point index: {self.selected_point}")
+                #print(f"self.pts2: {self.pts2}")
+                #print(f"Value at selected point: {self.pts2[self.selected_point]}")
+
+                # Draw selector on field image
+                self.field_image_selected = self.draw_landmark_selected(self.field_image.copy(), self.pts2[self.selected_point], yellow)
+
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image_selected)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+
+                # Cleanup
+                self.field_image_selected = None
+                
             elif event.key() == Qt.Key_3:
                 self.selected_point = 2
                 print("Selected landmark 3")
-                self.processoutputWindow.setText(f"Selected landmark 3" )
+                self.processoutputWindow.setText(f"Landmark 3 selected" )
+
+                #print(f"Selected point index: {self.selected_point}")
+                #print(f"self.pts2: {self.pts2}")
+                #print(f"Value at selected point: {self.pts2[self.selected_point]}")
+
+                # Draw selector on field image
+                self.field_image_selected = self.draw_landmark_selected(self.field_image.copy(), self.pts2[self.selected_point], yellow)
+
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image_selected)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)   
+
+                # Cleanup
+                self.field_image_selected = None             
+
             elif event.key() == Qt.Key_4:
                 self.selected_point = 3
                 print("Selected landmark 4")
-                self.processoutputWindow.setText(f"Selected landmark 4" )
+                self.processoutputWindow.setText(f"Landmark 4 selected" )
+
+                #print(f"Selected point index: {self.selected_point}")
+                #print(f"self.pts2: {self.pts2}")
+                #print(f"Value at selected point: {self.pts2[self.selected_point]}")
+
+                # Draw selector on field image
+                self.field_image_selected = self.draw_landmark_selected(self.field_image.copy(), self.pts2[self.selected_point], yellow)
+
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image_selected)
+                pixmap = QPixmap(self.pixmap)
+
+                #Load the image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+
+                # Cleanup
+                self.field_image_selected = None
 
             else:
                 super().keyPressEvent(event)  # Pass other key events to the base class
