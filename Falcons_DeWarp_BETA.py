@@ -307,8 +307,11 @@ class CameraWidget (QWidget):
         self.cap = cv2.VideoCapture(0) # webcam object
         self.pixmap = None
 
-        # Add cv_image Temp
+        # Add cv_image Temp (distorted frame)
         self.cv_image = None
+
+        # Add undistorted frame
+        self.undistorted_frame = None
 
         # Add field_image Temp
         self.field_image = None
@@ -952,91 +955,107 @@ class CameraWidget (QWidget):
             self.imageFrame.setPixmap(pixmap)
             self.imageFrame.setScaledContents(False) # Set to false to prevent issues with aspect ratio
 
-            #return self.cv_image
+            # TODO check pixmap set is not none
+            if self.imageFrame.pixmap() is not None:
+                self.processoutputWindow.setText("Image loaded")
+
+                # Prevent input until started
+                self.imageFrame.mousePressEvent = None
+                self.imageFrame.keyPressEvent = None
+
+            else:
+                self.processoutputWindow.setText("Problem displaying image")
     
     def start_pwarp(self):       
 
         # Stop Camera
-        self.timer.stop() # Should not be here !
+        self.timer.stop() # Should not be here ! works for now since only images are used
 
-        # Temp disable Start button untill all 4 points are collected TODO
-        self.startButtonPwarp.setDisabled(True) # Should not be here !
+        # Set Mouse Events
+        
 
-        # Disable the first tab (Camera Calibration)
-        self.tabs.setTabEnabled(0, False) # Should not be here !
+        # TODO Check if any pixmap is set before continuing
+        # Check if the pixmap is set on the Image Frane
+        if self.imageFrame.pixmap() is not None:
 
-        # Switch to the second tab (Perspective-Warp)
-        self.tabs.setCurrentIndex(1) # Should not be here !
+            # Temp disable Start button untill all 4 points are collected TODO
+            self.startButtonPwarp.setDisabled(True) # Should not be here !
 
-        if self.image_dewarp == True:
-            print("Image Perspective Warp started")
-            self.update_status_signal.emit("Image Perspective Warp started")         
+            # Disable the first tab (Camera Calibration)
+            self.tabs.setTabEnabled(0, False) # Should not be here !
 
-            frame = self.cv_image
+            # Switch to the second tab (Perspective-Warp)
+            self.tabs.setCurrentIndex(1) # Should not be here !
 
-            # Check if 'frame' is a valid NumPy array
-            if isinstance(frame, np.ndarray):
+            if self.image_dewarp == True:
+                print("Image Perspective Warp started")
+                self.update_status_signal.emit("Image Perspective Warp started")         
 
-                # Disable Load image Button when import succeeded and dewarp started
-                self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
+                frame = self.cv_image
 
-                if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
+                # Check if 'frame' is a valid NumPy array
+                if isinstance(frame, np.ndarray):
 
-                    self.warper_result = self.dewarp(frame) # return warper
+                    # Disable Load image Button when import succeeded and dewarp started
+                    self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
 
-                    # Apply camera correction if any set
-                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
 
-                    # Perform dewarping
-                    dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
+                        self.warper_result = self.dewarp(frame) # return warper
 
-                    # Update the display with the dewarped image
-                    self.display_dewarped_image(dewarped_frame)
+                        # Apply camera correction if any set
+                        undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
-                    # Print stuff and update status bar
-                    print("Dewarping process completed.")
-                    self.update_status_signal.emit("Dewarping process completed.")
+                        # Perform dewarping
+                        dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
 
-                    # Update button text for next step
-                    self.startButtonPwarp.setText("Tweak Landmarks")
+                        # Update the display with the dewarped image
+                        self.display_dewarped_image(dewarped_frame)
 
-                    # Need this later
-                    #self.startButtonPwarp.setText("DONE")
-                    #self.startButtonPwarp.clicked.connect(self.close_application) # close when done
-                    
-                    # TODO next steps - Tweak landmarks
-                    self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
+                        # Print stuff and update status bar
+                        print("Dewarping process completed.")
+                        self.update_status_signal.emit("Dewarping process completed.")
 
-                    if self.image_tuning_dewarp == False:
-                        self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
+                        # Update button text for next step
+                        self.startButtonPwarp.setText("Tweak Landmarks")
+                        
+                        # TODO next steps - Tweak landmarks
+                        self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
 
+                        if self.image_tuning_dewarp == False:
+                            self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
+
+                    else:
+                        print("Invalid frame format: Not a 3D array (color image)")
                 else:
-                    print("Invalid frame format: Not a 3D array (color image)")
-            else:
-                print("Invalid frame format: Not a NumPy array")
+                    print("Invalid frame format: Not a NumPy array")
 
 
-        elif self.usb_dewarp == True:
-            #usb_dewarp()
-            print("Starting usb camera de-warp") #-> update status
+            elif self.usb_dewarp == True:
+                #usb_dewarp()
+                print("Starting usb camera de-warp") #-> update status
 
-            # Start the camera again
-            self.timer.start(100)  # Assuming 100 milliseconds per frame update (fast is 20)
+                # Start the camera again
+                self.timer.start(100)  # Assuming 100 milliseconds per frame update (fast is 20)
 
-            # TODO
-            ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
+                # TODO
+                ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
 
-            if ret:  # if frame captured successfully
-                #frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
-                #original_inverted_frame = frame_inverted.copy()  # Store the original frame
-                #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                #dewarped_frame = self.warper.warp(undistorted_frame.copy())  # Perform dewarping
-                #self.display_dewarped_image(dewarped_frame)
-                pass # temp
+                if ret:  # if frame captured successfully
+                    #frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
+                    #original_inverted_frame = frame_inverted.copy()  # Store the original frame
+                    #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    #dewarped_frame = self.warper.warp(undistorted_frame.copy())  # Perform dewarping
+                    #self.display_dewarped_image(dewarped_frame)
+                    pass # temp
 
-        elif self.network_dewarp == True:
-            #network_dewarp()
-            print("Starting network de-warp") #-> update status
+            elif self.network_dewarp == True:
+                #network_dewarp()
+                print("Starting network de-warp") #-> update status
+        else:
+            print("No Image Loaded")
+            self.processoutputWindow.setText("No Image loaded")
+            QMessageBox.question(self, "Warning!", f"No Image detected.\n\nPlease make sure an Image is loaded", QMessageBox.Ok)
 
     def dewarp(self, img):
 
@@ -1151,6 +1170,18 @@ class CameraWidget (QWidget):
     
     def stop_tuning(self):
         self.image_tuning_dewarp == False
+
+        # Disable input
+        self.imageFrame.mousePressEvent = None
+        self.imageFrame.keyPressEvent = None
+
+        # Disable widget -> Maybe a bit much 
+        self.imageFrame.setEnabled(False)
+
+        # Set save options TODO
+        # For now Quit App
+        self.startButtonPwarp.setText("DONE")
+        self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> now closes directly without showing DONE
     
     def draw_landmark(self, image, landmark, color):
         # Draw the landmark
@@ -1318,13 +1349,16 @@ class CameraWidget (QWidget):
                 print("Update Image Frame / PWarp view")
 
                 # Perform pwarp at every key press to update frame
-                self.warper_result = self.dewarp(self.cv_image) # return warper
+                # self.warper_result = self.dewarp(self.cv_image.copy()) # return warper
 
                 # Apply camera correction if any set
-                undistorted_frame = self.undistort_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)
+                undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+
+                # Perform pwarp at every key press to update frame
+                self.warper_result = self.dewarp(undistorted_frame.copy()) # return warper
 
                 # Perform dewarping
-                dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
+                dewarped_frame = self.warper_result.warp(undistorted_frame)
 
                 # Update the display with the dewarped image
                 self.display_dewarped_image(dewarped_frame)
@@ -1416,7 +1450,7 @@ class CamCalMain(QMainWindow):
         file_menu.addAction(import_calibration)
 
         exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(self.close)
+        exit_action.triggered.connect(self.close) # of use close application function ??
         exit_action.setShortcut("Ctrl+D")
         file_menu.addAction(exit_action)
 
