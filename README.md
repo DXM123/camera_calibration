@@ -30,7 +30,7 @@ This Python application provides a user-friendly tool for camera calibration and
   - Live preview of perspective-corrected images.
 
 - **Tuning and Enhancing Images:**
-  - Fine-tune perspective warping parameters for optimal results. Use keys 1,2,3 and 4 to select landmark to tune.
+  - Fine-tune perspective warping parameters for optimal results. Use keys 1,2,3 and 4 to select landmark and arrow keys to tune.
   - Saving the results to binary file (TODO)
 
 ## Installation and Setup
