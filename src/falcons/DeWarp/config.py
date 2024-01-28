@@ -54,10 +54,10 @@ class DeWarpConfig:
     landmark4: Tuple[float, float] = dataclasses.field(init=False)
 
     field_coordinates_center: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_1: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_2: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_3: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_4: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_lm1: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_lm2: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_lm3: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_lm4: Tuple[int, int] = dataclasses.field(init=False)
 
     def __post_init__(self):
         self.field_length_total = self.field_length + 2 * self.safe_zone
@@ -72,19 +72,19 @@ class DeWarpConfig:
         self.landmark1 = (0, self.center_circle_radius)
         self.landmark1 = (0, self.field_width / 2)
 
-        self.field_coordinates_1 = (
+        self.field_coordinates_lm1 = (
             int((self.field_length_total / 2 - self.landmark1[0]) * self.ppm),
             int((self.field_width_total / 2 - self.landmark1[1]) * self.ppm),
         )
-        self.field_coordinates_2 = (
+        self.field_coordinates_lm2 = (
             int((self.field_length_total / 2 - self.landmark2[0]) * self.ppm),
             int((self.field_width_total / 2 - self.landmark2[1]) * self.ppm),
         )
-        self.field_coordinates_3 = (
+        self.field_coordinates_lm3 = (
             int((self.field_length_total / 2 - self.landmark3[0]) * self.ppm),
             int((self.field_width_total / 2 - self.landmark3[1]) * self.ppm),
         )
-        self.field_coordinates_4 = (
+        self.field_coordinates_lm4 = (
             int((self.field_length_total / 2 - self.landmark4[0]) * self.ppm),
             int((self.field_width_total / 2 - self.landmark4[1]) * self.ppm),
         )
