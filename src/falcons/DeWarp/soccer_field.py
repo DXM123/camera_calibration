@@ -7,7 +7,7 @@ from .common import SoccerFieldColors
 from .config import DeWarpConfig
 
 
-class Draw_SoccerField:
+class SoccerField:
     def __init__(self, config: DeWarpConfig):
         self.config: DeWarpConfig = config
 
