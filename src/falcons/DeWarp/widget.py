@@ -177,19 +177,22 @@ class CameraWidget(QWidget):
         # Add columns option
         self.columnsLabel = QLabel("# of Columns:", self)
         # self.columnsLabel.resize(220, 40)
-        self.columnsInput = QLineEdit(str(no_of_columns), self)
+        self.no_of_columns = self.config.no_of_columns
+        self.columnsInput = QLineEdit(str(self.no_of_columns), self)
         self.optionsFrame.layout.addWidget(self.columnsLabel)
         self.optionsFrame.layout.addWidget(self.columnsInput)
 
         # Add row option
         self.rowsLabel = QLabel("# of Rows:", self)
-        self.rowsInput = QLineEdit(str(no_of_rows), self)
+        self.no_of_rows = self.config.no_of_rows
+        self.rowsInput = QLineEdit(str(self.no_of_rows), self)
         self.optionsFrame.layout.addWidget(self.rowsLabel)
         self.optionsFrame.layout.addWidget(self.rowsInput)
 
         # Add square Size option
         self.squareSizeLabel = QLabel("Square size (mm):", self)
-        self.squareSizeRow = QLineEdit(str(square_size), self)
+        self.square_size = self.config.square_size
+        self.squareSizeRow = QLineEdit(str(self.square_size), self)
         self.optionsFrame.layout.addWidget(self.squareSizeLabel)
         self.optionsFrame.layout.addWidget(self.squareSizeRow)
 
@@ -362,13 +365,11 @@ class CameraWidget(QWidget):
         self.setLayout(self.layout)
 
     def start_capture(self):
-        global no_of_columns, no_of_rows, square_size
-
         if not self.capture_started:
             # Read user-input values for columns, rows, and square size
-            no_of_columns = int(self.columnsInput.text())
-            no_of_rows = int(self.rowsInput.text())
-            square_size = float(self.squareSizeRow.text())
+            self.no_of_columns = int(self.columnsInput.text())
+            self.no_of_rows = int(self.rowsInput.text())
+            self.square_size = float(self.squareSizeRow.text())
 
             # Start the timer when the button is clicked
             self.timer.start(100)  # Set the interval in milliseconds (e.g. 100 milliseconds)
@@ -425,7 +426,9 @@ class CameraWidget(QWidget):
 
             if self.capture_started:
                 # Call detectCorners function
-                ret_corners, corners, frame_with_corners = self.detectCorners(frame_inverted, no_of_columns, no_of_rows)
+                ret_corners, corners, frame_with_corners = self.detectCorners(
+                    frame_inverted, self.no_of_columns, self.no_of_rows
+                )
                 # print("Countdown is", self.countdown_seconds)
 
                 if ret_corners and self.countdown_seconds > 0:
@@ -555,11 +558,13 @@ class CameraWidget(QWidget):
                 frame = cv2.imread(file_path)
 
                 # Detect corners
-                ret_corners, corners, _ = self.detectCorners(frame, no_of_columns, no_of_rows)
+                ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
 
                 if ret_corners:
                     # Assuming that the chessboard is fixed on the (0, 0, 0) plane
-                    object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
+                    object_points.append(
+                        self.generate_object_points(self.no_of_columns, self.no_of_rows, self.square_size)
+                    )
                     image_points.append(corners)
 
         # check with min_cap for minimum images needed for calibration (Default is 3)
@@ -1211,7 +1216,7 @@ class CameraWidget(QWidget):
         self.pts1 = np.array(pts1)
         self.landmark_points = np.array(pts2)
 
-        M = cv2.getPerspectiveTransform(self.pts1, self.landmark_points)
+        M = cv2.getPerspectiveTransform(self.pts1.astype(np.float32), self.landmark_points.astype(np.float32))
 
         supersample = self.supersample
 

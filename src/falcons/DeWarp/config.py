@@ -1,4 +1,5 @@
 import dataclasses
+import os
 from typing import Optional, Tuple
 
 import yaml
@@ -68,32 +69,33 @@ class DeWarpConfig:
         )
 
         self.landmark1 = (self.center_circle_radius, 0)
-        self.landmark1 = (self.field_width / 2, 0)
-        self.landmark1 = (0, self.center_circle_radius)
-        self.landmark1 = (0, self.field_width / 2)
+        self.landmark2 = (self.field_width / 2, 0)
+        self.landmark3 = (0, self.center_circle_radius)
+        self.landmark4 = (0, self.field_width / 2)
 
+        # TODO Why are the x-y coordinates flipped wrt to the landmarks?
         self.field_coordinates_lm1 = (
-            int((self.field_length_total / 2 - self.landmark1[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark1[1]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark1[1]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark1[0]) * self.ppm),
         )
         self.field_coordinates_lm2 = (
-            int((self.field_length_total / 2 - self.landmark2[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark2[1]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark2[1]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark2[0]) * self.ppm),
         )
         self.field_coordinates_lm3 = (
-            int((self.field_length_total / 2 - self.landmark3[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark3[1]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark3[1]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark3[0]) * self.ppm),
         )
         self.field_coordinates_lm4 = (
-            int((self.field_length_total / 2 - self.landmark4[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark4[1]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark4[1]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark4[0]) * self.ppm),
         )
 
 
 def get_config(path_to_config: Optional[str] = None) -> DeWarpConfig:
     """Takes a str to a `.yaml` or if `None` loads the default Falcon config."""
     if not path_to_config:
-        path_to_config = "falcon_config.yaml"
+        path_to_config = os.path.join(os.path.dirname(__file__), "falcon_config.yaml")
     with open(path_to_config, "r") as f:
         config = yaml.safe_load(f)
 

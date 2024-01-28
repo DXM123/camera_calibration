@@ -35,14 +35,13 @@ class Warper(object):
         self.landmark_points = landmark_points
         # self.landmark_points = np.array([FCS20, FCS60, FCS06, FCS02])  # Odd order ofcourse but looks ok TODO
 
-        logger = logging.getLogger(__name__)
-        logger.info(
+        logging.info(
             "Following values used as input for Warper Class:"
             f" \nWidth: {self.width}.\nHeight: {self.height}.\nSuperSample: {self.supersample}\n"
             f"Points: {self.points}.\nLandMarkPoints:{self.landmark_points}."
         )
 
-        self.M = cv2.getPerspectiveTransform(self.points, self.landmark_points)
+        self.M = cv2.getPerspectiveTransform(self.points.astype(np.float32), self.landmark_points.astype(np.float32))
         self.dst = None
         if interpolation == None:
             self.interpolation = cv2.INTER_CUBIC

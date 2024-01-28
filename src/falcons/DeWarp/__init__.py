@@ -1,14 +1,18 @@
-# import sys
+import sys
 
-# from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication
 
-# from .application import CamCalMain
+from .application import CamCalMain
 
 __version__: str = "0.0.0"
 
 
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     ex = CamCalMain()
-#     ex.show()
-#     sys.exit(app.exec_())
+def run():
+    app = QApplication(sys.argv)
+    ex = CamCalMain()
+    ex.show()
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    run()
