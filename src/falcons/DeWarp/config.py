@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Optional
+from typing import Optional, Tuple
 
 import yaml
 
@@ -39,9 +39,55 @@ class DeWarpConfig:
         init=False
     )  # field_width + 2 * safe_zone  -- Adding safety zone to the width
 
+    ### Landmarks
+    # For 18 x 12 meter Field -- Falcon defaults
+    # TODO Should the landmarks be
+    # 1) read from config or
+    # 2) inferred from `field_width` and `center_circle_radius` --- current setting
+    # Landmark 1, where the middle circle meets the middle line
+    landmark1: Tuple[float, float] = dataclasses.field(init=False)
+    # Landmark 2, where the middle line meets the outer field line
+    landmark2: Tuple[float, float] = dataclasses.field(init=False)
+    # Landmark 3, from the center circle spot towards the goal, where the (fictive) line meets the center circle line
+    landmark3: Tuple[float, float] = dataclasses.field(init=False)
+    # Landmark 4, Penalty Spot
+    landmark4: Tuple[float, float] = dataclasses.field(init=False)
+
+    field_coordinates_center: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_1: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_2: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_3: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_4: Tuple[int, int] = dataclasses.field(init=False)
+
     def __post_init__(self):
         self.field_length_total = self.field_length + 2 * self.safe_zone
         self.field_width_total = self.field_width + 2 * self.safe_zone
+        self.field_coordinates_center = (
+            int(self.field_length_total / 2) * self.ppm,
+            int(self.field_width_total / 2) * self.ppm,
+        )
+
+        self.landmark1 = (self.center_circle_radius, 0)
+        self.landmark1 = (self.field_width / 2, 0)
+        self.landmark1 = (0, self.center_circle_radius)
+        self.landmark1 = (0, self.field_width / 2)
+
+        self.field_coordinates_1 = (
+            int((self.field_length_total / 2 - self.landmark1[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark1[1]) * self.ppm),
+        )
+        self.field_coordinates_2 = (
+            int((self.field_length_total / 2 - self.landmark2[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark2[1]) * self.ppm),
+        )
+        self.field_coordinates_3 = (
+            int((self.field_length_total / 2 - self.landmark3[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark3[1]) * self.ppm),
+        )
+        self.field_coordinates_4 = (
+            int((self.field_length_total / 2 - self.landmark4[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark4[1]) * self.ppm),
+        )
 
 
 def get_config(path_to_config: Optional[str] = None) -> DeWarpConfig:
