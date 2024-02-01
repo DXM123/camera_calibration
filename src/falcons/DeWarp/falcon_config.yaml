@@ -1,0 +1,24 @@
+# Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
+no_of_columns: 7  # number of columns of your Checkerboard
+no_of_rows: 7  # number of rows of your Checkerboard
+square_size: 27.0  # size of square on the Checkerboard in mm -> This is no longer required?
+min_cap: 3  # minimum or images to be collected by capturing (Default is 10), minimum is 3
+
+# Assuming the soccer field is 22 x 14 meters - old
+soccer_field_width: 22
+soccer_field_length: 14
+
+# Field Size and other dimensions for MSL field 18 x 12 meter
+field_length: 18  # meters
+field_width: 12  # meters
+penalty_area_length: 2.25  # E, meters
+penalty_area_width: 6.5  # C, meters
+goal_area_length: 0.75  # F, meters
+goal_area_width: 3.5  # D, meters
+center_circle_radius: 2  # H, meters
+spot_radius: 0.15
+goal_depth: 0.5  # Goal depth,
+goal_width: 2.0  # Goal width 2m for this field -> 2.4m allowed?
+line_width: 0.125  # K, meters
+ppm: 100  # pixels per meter
+safe_zone: 1  # Safety zone around the field, meters

@@ -62,3 +62,11 @@ Tested on Ubuntu 22.04 LTS
     chmod +x Falcons_DeWarp_BETA.py
     ./Falcons_DeWarp_BETA.py
     ```
+
+5. Or install the package in python
+
+    ```bash
+    cd camera_calibration
+    pip install -e .
+    python -c "from falcons.DeWarp import run; run()"
+    ```
