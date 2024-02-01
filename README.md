@@ -52,7 +52,7 @@ Tested on Ubuntu 22.04 LTS
 3. Install other required packages (`numpy` and `PyQt5`):
 
     ```bash
-    pip install -r requirements.txt
+    python3 -m pip install -r requirements.txt
     ```
 
 4. Run the script. Make sure it is executable:
