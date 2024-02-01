@@ -52,6 +52,7 @@ Tested on Ubuntu 22.04 LTS
 3. Install other required packages (`numpy`, `PyQt5` and PyQt5 dependency `libxcb-xinerama0`):
 
     ```bash
+    python3 -m pip install --upgrade pip
     python3 -m pip install -r requirements.txt
     ```
 
