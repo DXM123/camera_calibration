@@ -49,14 +49,21 @@ Tested on Ubuntu 22.04 LTS
     sudo apt-get install python3-opencv
     ```
 
-3. Run the script. Make sure it is executable:
+3. Install other required packages (`numpy`, `PyQt5` and PyQt5 dependency `libxcb-xinerama0`):
+
+    ```bash
+    python3 -m pip install --upgrade pip
+    python3 -m pip install -r requirements.txt
+    ```
+
+4. Run the script. Make sure it is executable:
 
     ```bash
     chmod +x Falcons_DeWarp_BETA.py
     ./Falcons_DeWarp_BETA.py
     ```
 
-4. Or install the package in python
+5. Or install the package in python
 
     ```bash
     cd camera_calibration
