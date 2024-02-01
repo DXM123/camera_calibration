@@ -49,7 +49,7 @@ Tested on Ubuntu 22.04 LTS
     sudo apt-get install python3-opencv
     ```
 
-3. Install other required packages (`numpy` and `PyQt5`):
+3. Install other required packages (`numpy`, `PyQt5` and PyQt5 dependency `libxcb-xinerama0`):
 
     ```bash
     python3 -m pip install -r requirements.txt
