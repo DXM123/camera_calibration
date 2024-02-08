@@ -313,6 +313,9 @@ class CameraWidget (QWidget):
         # Add undistorted frame
         self.undistorted_frame = None
 
+        # Add dewarped frame
+        self.dewarped_frame = None
+
         # Add field_image Temp
         self.field_image = None
 
@@ -672,7 +675,7 @@ class CameraWidget (QWidget):
                 if ret_corners:
                     # Display the frame with corners
                     self.pixmap = self.CameraToPixmap(frame_with_corners)
-                    #self.cameraFrame.setPixmap(self.pixmap)
+                    self.cameraFrame.setPixmap(self.pixmap)
                 else:
                     # Display the original frame
                     self.pixmap = self.CameraToPixmap(frame_inverted)
@@ -955,7 +958,7 @@ class CameraWidget (QWidget):
             self.imageFrame.setPixmap(pixmap)
             self.imageFrame.setScaledContents(False) # Set to false to prevent issues with aspect ratio
 
-            # TODO check pixmap set is not none
+            # check pixmap set is not none
             if self.imageFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
 
@@ -973,8 +976,6 @@ class CameraWidget (QWidget):
 
         # Set Mouse Events
         
-
-        # TODO Check if any pixmap is set before continuing
         # Check if the pixmap is set on the Image Frane
         if self.imageFrame.pixmap() is not None:
 
@@ -982,10 +983,10 @@ class CameraWidget (QWidget):
             self.startButtonPwarp.setDisabled(True) # Should not be here !
 
             # Disable the first tab (Camera Calibration)
-            self.tabs.setTabEnabled(0, False) # Should not be here !
+            #self.tabs.setTabEnabled(0, False) # Should not be here !
 
             # Switch to the second tab (Perspective-Warp)
-            self.tabs.setCurrentIndex(1) # Should not be here !
+            #self.tabs.setCurrentIndex(1) # Should not be here !
 
             if self.image_dewarp == True:
                 print("Image Perspective Warp started")
@@ -1007,22 +1008,24 @@ class CameraWidget (QWidget):
                         undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                         # Perform dewarping
-                        dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
+                        self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
 
                         # Update the display with the dewarped image
-                        self.display_dewarped_image(dewarped_frame)
+                        self.display_dewarped_image(self.dewarped_frame)
 
                         # Print stuff and update status bar
                         print("Dewarping process completed.")
                         self.update_status_signal.emit("Dewarping process completed.")
 
-                        # Update button text for next step
-                        self.startButtonPwarp.setText("Tweak Landmarks")
+                        ## Check if tweak already started to prevent overwrite button text
+                        if not self.image_tuning_dewarp == True:
+                            # Update button text for next step
+                            self.startButtonPwarp.setText("Tweak Landmarks")
                         
-                        # TODO next steps - Tweak landmarks
-                        self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
+                            # Tweak landmarks
+                            self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
 
-                        if self.image_tuning_dewarp == False:
+                        #if self.image_tuning_dewarp == False:
                             self.startButtonPwarp.clicked.disconnect(self.start_pwarp) # disconnect the previous connection
 
                     else:
@@ -1053,6 +1056,12 @@ class CameraWidget (QWidget):
                 #network_dewarp()
                 print("Starting network de-warp") #-> update status
         else:
+            # Disable the first tab (Camera Calibration)
+            self.tabs.setTabEnabled(0, False) # Should not be here !
+
+            # Switch to the second tab (Perspective-Warp)
+            self.tabs.setCurrentIndex(1) # Should not be here !
+
             print("No Image Loaded")
             self.processoutputWindow.setText("No Image loaded")
             QMessageBox.question(self, "Warning!", f"No Image detected.\n\nPlease make sure an Image is loaded", QMessageBox.Ok)
@@ -1141,9 +1150,11 @@ class CameraWidget (QWidget):
 
                 # Enable Start button again when all 4 points are collected
                 self.startButtonPwarp.setDisabled(False)
-                
-                # Stop mouse press event registration
-                self.imageFrame.mousePressEvent = None
+
+                if not self.image_tuning_dewarp == True:
+                    
+                    # Stop mouse press event registration
+                    self.imageFrame.mousePressEvent = None
 
                 if self.image_tuning_dewarp == True:
                     # tune self.point before processing them when tuning is enabled
@@ -1153,7 +1164,7 @@ class CameraWidget (QWidget):
 
                     # TODO - need a way to update field image on key event
 
-                    self.startButtonPwarp.setText("Click when done tuning")
+                    self.startButtonPwarp.setText("Click when done tuning")  ## Not updating TODO
                     self.startButtonPwarp.clicked.connect(self.stop_tuning)
 
                 break
@@ -1163,7 +1174,7 @@ class CameraWidget (QWidget):
         print(f"Check UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
         print(f"Check cameraFrame| W: {self.cameraFrame.width()}, H: {self.cameraFrame.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
 
-        # TODO is CameraFrame the best option?
+        # TODO is CameraFrame the best option? -> Image size when using images TODO
         warper = Warper(points=self.points, width=self.cameraFrame.width, height=self.cameraFrame.height, supersample=self.supersample)
 
         return warper
@@ -1172,16 +1183,24 @@ class CameraWidget (QWidget):
         self.image_tuning_dewarp == False
 
         # Disable input
-        self.imageFrame.mousePressEvent = None
-        self.imageFrame.keyPressEvent = None
+        #self.imageFrame.mousePressEvent = None
+        #self.imageFrame.keyPressEvent = None
 
         # Disable widget -> Maybe a bit much 
         self.imageFrame.setEnabled(False)
 
+        ################################################################
+
         # Set save options TODO
+        self.startButtonPwarp.setText("Save to binary file")
+        self.startButtonPwarp.clicked.connect(self.save_prep_mat_binary)
+
+
         # For now Quit App
-        self.startButtonPwarp.setText("DONE")
-        self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> now closes directly without showing DONE
+        #self.startButtonPwarp.setText("DONE")
+        #self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> now closes directly without showing DONE
+
+        ##############################################################
     
     def draw_landmark(self, image, landmark, color):
         # Draw the landmark
@@ -1291,7 +1310,7 @@ class CameraWidget (QWidget):
                 self.field_image_selected = None
                 
             elif event.key() == Qt.Key_3:
-                self.selected_point = 2
+                self.selected_point = 3 # should be 2 TODO
                 print("Selected landmark 3")
                 self.processoutputWindow.setText(f"Landmark 3 selected" )
 
@@ -1314,7 +1333,7 @@ class CameraWidget (QWidget):
                 self.field_image_selected = None             
 
             elif event.key() == Qt.Key_4:
-                self.selected_point = 3
+                self.selected_point = 2 # should be 3 TODO
                 print("Selected landmark 4")
                 self.processoutputWindow.setText(f"Landmark 4 selected" )
 
@@ -1358,14 +1377,15 @@ class CameraWidget (QWidget):
                 self.warper_result = self.dewarp(undistorted_frame.copy()) # return warper
 
                 # Perform dewarping
-                dewarped_frame = self.warper_result.warp(undistorted_frame)
+                self.dewarped_frame = self.warper_result.warp(undistorted_frame)
 
                 # Update the display with the dewarped image
-                self.display_dewarped_image(dewarped_frame)
+                self.display_dewarped_image(self.dewarped_frame)
                     
             else:
                 print("Pixmap is not set")
 
+    # Verify correct direction TODO -> Need visual feedback when tweaking
     def adjust_point(self, point, direction):
         """ Adjust the point based on arrow key input """
         x, y = point
@@ -1383,6 +1403,7 @@ class CameraWidget (QWidget):
             return (x + 1, y)
         return point
     
+    # Below not used now!! To Remove !! TODO
     # do i need this or can i use display_dewarped_image again
     def update_perspective_transform(self, pts1, pts2):
         
@@ -1403,7 +1424,7 @@ class CameraWidget (QWidget):
         if self.frame is None:
             self.frame = cv2.warpPerspective(self.frame,M,(W*supersample,H*supersample))
         else:
-            self.frame[:] = cv2.warpPerspective(self.frame,M,(W*supersample,H*supersample))  # -> issue using from frame.shape-
+            self.frame[:] = cv2.warpPerspective(self.frame,M,(W*supersample,H*supersample))  # -> issue using from frame.shape
         
         # Convert the adjusted image to QPixmap and display it
         self.display_landmarks(self.frame) # TODO
@@ -1420,6 +1441,83 @@ class CameraWidget (QWidget):
 
         # Start de warp again for tuning
         self.start_pwarp()
+
+    ####################### Binary file stuff WIP ###################
+        
+    def write_mat_binary_old(self, ofs, out_mat):
+        if not ofs:
+            return False
+        if out_mat is None:
+            s = 0
+            ofs.write(s.to_bytes(4, byteorder='little'))
+            return True
+        rows, cols = out_mat.shape[:2]
+        dtype = out_mat.dtype
+        ofs.write(rows.to_bytes(4, byteorder='little'))
+        ofs.write(cols.to_bytes(4, byteorder='little'))
+        ofs.write(np.uint32(dtype).tobytes())
+        ofs.write(out_mat.tobytes())
+        return True
+    
+    def write_mat_binary(self, ofs, out_mat):
+        if not ofs:
+            return False
+        if out_mat is None:
+            s = 0
+            ofs.write(s.to_bytes(4, byteorder='little'))
+            return True
+        rows, cols = out_mat.shape[:2]
+        dtype = out_mat.dtype.itemsize  # Corrected line
+        ofs.write(rows.to_bytes(4, byteorder='little'))
+        ofs.write(cols.to_bytes(4, byteorder='little'))
+        ofs.write(np.uint32(dtype).tobytes())
+        ofs.write(out_mat.tobytes())
+        return True
+    
+    ##################################################################
+    
+    def save_prep_mat_binary(self):
+        # Example usage:
+        # mat = cv2.imread('image.jpg')
+        filename = "mat.bin"
+        mat = self.dewarped_frame
+        # self.save_mat_binary('mat.bin', mat)
+        # loaded_mat = cv2.imread('mat.bin')
+        #print ("Saving to binary file <name> and saving Mat image")
+        #return self.save_mat_binary('mat.bin', mat)
+        print(f"Saving to binary file {filename} and saving Mat image")
+        return self.save_mat_binary(filename, mat)
+    
+    #################################################################
+
+    def save_mat_binary(self, filename, output):
+        with open(filename, 'wb') as ofs:
+            return self.write_mat_binary(ofs, output)
+
+
+    def read_mat_binary(self, ifs, in_mat):
+        if not ifs:
+            return False
+        rows = int.from_bytes(ifs.read(4), byteorder='little')
+        if rows == 0:
+            return True
+        cols = int.from_bytes(ifs.read(4), byteorder='little')
+        dtype = np.dtype(int(np.uint32.frombytes(ifs.read(4), byteorder='little')))
+        in_mat.release()
+        in_mat.create(rows, cols, dtype)
+        in_mat.data = ifs.read(in_mat.elemSize() * in_mat.total())
+        return True
+
+    def load_mat_binary(self, filename, output):
+        with open(filename, 'rb') as ifs:
+            return self.read_mat_binary(ifs, output)
+
+    # Example usage:
+    # mat = cv2.imread('image.jpg')
+    # self.save_mat_binary('mat.bin', mat)
+    # loaded_mat = cv2.imread('mat.bin')
+        
+    #############################################################
 
     def close_application(self):
         QApplication.quit()
@@ -1490,8 +1588,8 @@ class CamCalMain(QMainWindow):
 
             else:
                 # If the user chooses not to delete, inform them and exit the method
-                QMessageBox.information(self, "Calibration Canceled", "Calibration process canceled.", QMessageBox.Ok)
-
+                QMessageBox.information(self, "Fresh Calibration Canceled", "Fresh Calibration process canceled.", QMessageBox.Ok)
+                # exit : close_application
                 return
 
     def load_calibration(self, filename):
