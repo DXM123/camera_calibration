@@ -4,8 +4,7 @@ from PyQt5.QtWidgets import QApplication
 
 from .application import CamCalMain
 
-__version__: str = "0.0.0"
-
+__version__ = '0.0.3'
 
 def run():
     app = QApplication(sys.argv)
