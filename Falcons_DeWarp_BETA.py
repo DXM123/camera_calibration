@@ -813,7 +813,7 @@ class CameraWidget (QWidget):
                 frame_with_corners = cv2.cvtColor(frame_with_corners, cv2.COLOR_BGR2RGB)
                 self.pixmap = self.imageToPixmap(frame_with_corners)
                 self.cameraFrame.setPixmap(self.pixmap)
-                # Only save when not testing
+                # Only save when not testing 
                 if self.test_calibration != True:
                     self.save_screenshot(org_image)  # Save original Frame
             else:

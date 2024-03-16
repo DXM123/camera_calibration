@@ -178,7 +178,7 @@ class CameraWidget(QWidget):
         # self.optionsFrame.layout.addStretch(1)
 
         # Set fixed width for optionsFrame
-        self.optionsFrame.setFixedWidth(400)
+        # self.optionsFrame.setFixedWidth(400)
 
         #============= Add new options USB / Image / Network like Tab2
 
