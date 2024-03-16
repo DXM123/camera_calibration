@@ -35,7 +35,7 @@ This Python application provides a user-friendly tool for camera calibration and
 
 ## Installation and Setup
 
-Tested on Ubuntu 22.04 LTS
+Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
 
 1. Clone the repository:
 
