@@ -162,8 +162,7 @@ cython_debug/
 # Ignored directories
 output/
 dump/
-test/
-#R13/
+#test/
 
 # Ignored files
 *.log

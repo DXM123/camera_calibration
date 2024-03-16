@@ -565,6 +565,7 @@ class CameraWidget(QWidget):
 
             # Undistort frame using camera matrix and dist coeff
             undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+
             #image = undistorted_frame # cheesey replace
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
@@ -654,7 +655,8 @@ class CameraWidget(QWidget):
 
     def detectCorners(self, image, columns, rows):
         # stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed.
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -669,7 +671,8 @@ class CameraWidget(QWidget):
         if ret:
             print("Corners detected successfully!")
             # Refining pixel coordinates for given 2d points.
-            cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            #cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
 
             # draw and display the chessboard corners
             cv2.drawChessboardCorners(image, (columns, rows), corners, ret)

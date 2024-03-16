@@ -800,8 +800,9 @@ class CameraWidget (QWidget):
             print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
             print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-            # Undistort frame using camera matrix and dist coeff
+            # Undistort frame using camera matrix and dist coeff (Add Selection option for Fish-Eye TODO)
             undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            #undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
             #image = undistorted_frame # cheesey replace
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
@@ -851,7 +852,10 @@ class CameraWidget (QWidget):
                 print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
+                # Add Selection option for Fish-eye TODO
                 undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                #undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                
                 frame_inverted = undistorted_frame # cheesey replace
 
             if self.capture_started:
@@ -894,7 +898,8 @@ class CameraWidget (QWidget):
     def detectCorners(self, image, columns, rows):
         
         # stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -905,7 +910,8 @@ class CameraWidget (QWidget):
         if ret:
             print("Corners detected successfully!")
             # Refining pixel coordinates for given 2d points.
-            cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            # cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
 
             # draw and display the chessboard corners
             cv2.drawChessboardCorners(image, (columns, rows), corners, ret)
@@ -1097,6 +1103,38 @@ class CameraWidget (QWidget):
 
             return frame
         
+    ############################################################################################
+        
+    # When lens field of view is above 160 degree we need fisheye undistort function for opencv
+    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients):
+        # Check if camera_matrix and distortion_coefficients are available
+        if camera_matrix is not None and distortion_coefficients is not None:
+            # Only 4 distortion coefficient values are allowed below, so get the first 4
+            # Adjusting to use only the first 4 coefficients for fisheye model
+            dist_coeff_flatten = distortion_coefficients[:, :4].flatten()
+
+            # dim 1 = original image, 2 = 
+            balance = 1 # original image
+
+            # Create a new optimal camera matrix for undistortion
+            new_camera_matrix, roi = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
+                camera_matrix, dist_coeff_flatten, frame.shape[:2], np.eye(3), balance)
+            
+            # Undistort the frame using the fisheye correction
+            undistorted_frame = cv2.fisheye.undistortImage(
+                frame, camera_matrix, distortion_coefficients, Knew=new_camera_matrix)
+            
+            # Crop the frame based on the region of interest (optional)
+            x, y, w, h = roi
+            undistorted_frame = undistorted_frame[y:y+h, x:x+w]
+
+            return undistorted_frame
+        else:
+            print("No camera matrix or distortion coefficient detected, showing original frame")
+            return frame
+        
+    #################################################################################################
+        
     def save_calibration(self):
         # TODO verify why save_calibration is called when CTRL-D is pressed or when going to De-warp next step 
         print("Saving Calibration parameters to file")
@@ -1214,8 +1252,9 @@ class CameraWidget (QWidget):
 
                         self.warper_result = self.dewarp(frame) # return warper
 
-                        # Apply camera correction if any set
+                        # Apply camera correction if any set (add selection for fish eye TODO)
                         undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                        #undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
@@ -1585,8 +1624,9 @@ class CameraWidget (QWidget):
                 print(f"Camera Matrix:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
-                # Apply camera correction if any set
+                # Apply camera correction if any set ( Add Selection opion for Fish-Eye TODO)
                 undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                #undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
 
                 # Perform pwarp at every key press to update frame
                 self.warper_result = self.dewarp(undistorted_frame.copy()) # return warper
