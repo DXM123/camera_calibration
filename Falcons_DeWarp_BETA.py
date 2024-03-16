@@ -212,9 +212,11 @@ class Draw_SoccerField:
 class Warper(object):
     def __init__(self,points,width=640,height=480,supersample=2,interpolation=None):
         self.points = points
-        #self.width  = width
-        #self.height = height
         self.supersample = supersample
+
+        #Give warper Class the width and height attrbutes
+        self.width  = width 
+        self.height = height
 
         print("Following values used as input for Warper Class: ")
         print(f"W:{self.width()}")  # Access the width attribute of the warper instance
@@ -800,6 +802,7 @@ class CameraWidget (QWidget):
 
             # Undistort frame using camera matrix and dist coeff
             undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+
             #image = undistorted_frame # cheesey replace
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
@@ -991,6 +994,7 @@ class CameraWidget (QWidget):
         if len(object_points) >= min_cap:
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
             # Perform camera calibration
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
                 object_points, image_points, (frame.shape[1], frame.shape[0]), None, None
@@ -998,16 +1002,14 @@ class CameraWidget (QWidget):
 
             if ret:  # if calibration was successfully
                 # Display the calibration results
-                self.outputWindow.setText(f"Camera matrix:{camera_matrix}")
-                print("\n Camera matrix:")
-                print(camera_matrix)
+                self.outputWindow.setText(f"Camera matrix found:{camera_matrix}")
+                print(f"Camera matrix found:{camera_matrix}")
 
                 # Assign camera_matrix to the instance variable
                 self.camera_matrix = camera_matrix
 
-                self.outputWindow.setText(f"Distortion coefficient:{distortion_coefficients}")
-                print("\n Distortion coefficient:")
-                print(distortion_coefficients)
+                self.outputWindow.setText(f"Distortion coefficient found:{distortion_coefficients}")
+                print(f"Distortion coefficient found:{distortion_coefficients}")
 
                 # Assign camera_distortion coefficient to the instance variable
                 self.camera_dist_coeff = distortion_coefficients
@@ -1071,7 +1073,7 @@ class CameraWidget (QWidget):
         if self.input_images.isChecked():
             #Load images again (index should be -1 again)
             self.current_image_index = -1
-            self.load_next_image() # Loads First image in index -> not undistort TODO
+            self.load_next_image() # Loads First image in index
 
         if self.cal_imported == False and self.cal_saved == False: # TRY to prevent double save
             # Update Test Calibration to Save to File

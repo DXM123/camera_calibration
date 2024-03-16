@@ -23,9 +23,12 @@ class Warper(object):
             height, (int, float)
         ), "Width and height should be numerical values."
         assert isinstance(supersample, (int, float)), "Supersample should be a numerical value."
-        #self.width = width
-        #self.height = height
+
         self.supersample = supersample
+        
+        #Give warper Class the width and height attrbutes
+        self.width = width
+        self.height = height
 
         self.points = points
         # self.points = np.array([points[0], points[1], points[3], points[2]])
