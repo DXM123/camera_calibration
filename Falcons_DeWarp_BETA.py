@@ -6,6 +6,7 @@ import datetime
 import os
 import json # OOB available in python (to save calibration file)
 import numpy as np
+import glob # for load_images
 from PyQt5.QtWidgets import (
     QMainWindow,
     QApplication,
@@ -39,7 +40,10 @@ from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QTimer
 no_of_columns = 7  #number of columns of your Checkerboard
 no_of_rows = 7  #number of rows of your Checkerboard
 square_size = 27.0 # size of square on the Checkerboard in mm -> This is no longer required?
-min_cap = 3 # minimum or images to be collected by capturing (Default is 10), minimum is 3
+min_cap = 3 # minimum or images to be collected by capturing (Default is 10)
+
+#NEW
+cam_height = 75 # in cm to center of lens
 
 # Assuming the soccer field is 22 x 14 meters - old
 soccer_field_width = 22
@@ -86,8 +90,9 @@ hot_pink = (255, 105, 180)
 gold = (255, 215, 0)
 
 # For 18 x 12 meter Field
+# for cam view 3 depending on 1/4 of field that we are tuning
 # Landmark 1, where the middle circle meets the middle line
-landmark1 = (2,0)
+landmark1 = (2,0) # (-2,0) (0,2) (0,-2)
 
 # Landmark 2, where the middle line meets the outer field line
 landmark2 = (6,0) # field_width / 2, 0
@@ -205,10 +210,10 @@ class Draw_SoccerField:
 ################# Perspective Warp Classes ################# 
 
 class Warper(object):
-    def __init__(self,points,width=640,height=480,supersample=2,interpolation=None):
+    def __init__(self,points,width=640,height=480,supersample=2,interpolation=None): #TODO make widt and height dynamic based in image
         self.points = points
-        self.width  = width
-        self.height = height
+        #self.width  = width
+        #self.height = height
         self.supersample = supersample
 
         print("Following values used as input for Warper Class: ")
@@ -217,7 +222,8 @@ class Warper(object):
         print(f"SS:{self.supersample}")  # Access the supersample attribute of the warper instance
 
         # Collected points
-        self.pts1 = np.float32([points[0],points[1],points[3],points[2]])
+        #self.pts1 = np.float32([points[0],points[1],points[3],points[2]]) # Odd order ! TODO
+        self.pts1 = np.float32([points[0],points[1],points[2],points[3]]) 
 
         print("self.pts1:", self.pts1)
 
@@ -248,7 +254,7 @@ class Warper(object):
             self.interpolation = interpolation
 
     def warp(self,img,out=None):
-        # Call the height and width method to get the actual value of the frame
+        # Call the height and width method to get the actual value of the frame -> but this is not a method !!! TODO
         W = self.width()
         H = self.height()
 
@@ -260,7 +266,7 @@ class Warper(object):
         else:
             self.dst[:] = cv2.warpPerspective(img,M,(W*supersample,H*supersample))
 
-        # is this needed ??? TODO
+        # is this needed ??? TODO  Supersample is a factor by which the image is scaled up for the transformation. This can help reduce aliasing.
         if supersample == 1:
             if out == None:
                 return self.dst
@@ -286,6 +292,10 @@ class CameraWidget (QWidget):
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
 
+        # Index for loaded images
+        self.image_files = []
+        self.current_image_index = -1  # Start with -1, so the first image is at index 0
+
          # Add a QTimer countdown timer
         self.countdown_timer = QTimer(self)
         self.countdown_timer.timeout.connect(self.update_countdown)
@@ -298,6 +308,7 @@ class CameraWidget (QWidget):
         self.capture_started = False # Track if caputure is started
         self.test_started = False # Track if test is started
         self.cal_imported = False # Track if imported calibration is used
+        self.cal_saved = False # Track if calibration is saved to file
         self.image_dewarp = False # Track if an image is used for dewarping
         self.usb_dewarp = False # Track if an USB camera is used for dewarping
         self.network_dewarp = False # Track if an network stream is used for dewarping
@@ -386,7 +397,7 @@ class CameraWidget (QWidget):
         # Set alignment to center the text within the QLabel
         self.cameraFrame.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
 
-        self.cameraFrame.resize(640, 480)
+        self.cameraFrame.resize(640, 480) # start value
         self.cameraFrame.setFrameShape(QFrame.Box)
         self.tab1inner.layout.addWidget(self.cameraFrame)
 
@@ -405,7 +416,44 @@ class CameraWidget (QWidget):
         #self.optionsFrame.layout.addStretch(1)
 
         # Set fixed width for optionsFrame
-        self.optionsFrame.setFixedWidth(400)
+        #self.optionsFrame.setFixedWidth(500)
+
+        #============= Add new options USB / Image / Network like Tab2
+
+        # Add options widgets to optionsFrame:
+        input_label = QLabel("Input Options:")
+        input_label.setFixedHeight(48)
+        self.optionsFrame.layout.addWidget(input_label)
+
+        # Add radio buttons for selecting options
+        self.input_layout = QHBoxLayout()
+
+        self.input_camera = QRadioButton("CAM")
+        self.input_network = QRadioButton("Network")
+        self.input_images = QRadioButton("Images") 
+        
+        # If switch to images then change "Start Capture" Button to Load Images
+
+        # Set "USB" as the default option
+        self.input_camera.setChecked(True)
+
+        # Connect the toggled signal of radio buttons to a slot function
+        self.input_images.toggled.connect(self.update_capture_button_state)
+        self.input_network.toggled.connect(self.update_capture_button_state)
+
+        # Create a button group to make sure only one option is selected at a time
+        self.input_group = QButtonGroup()
+        self.input_group.addButton(self.input_camera)
+        self.input_group.addButton(self.input_network)
+        self.input_group.addButton(self.input_images)
+
+        self.input_layout.addWidget(self.input_camera)
+        self.input_layout.addWidget(self.input_network)
+        self.input_layout.addWidget(self.input_images)
+
+        self.optionsFrame.layout.addLayout(self.input_layout)
+
+        #===============================================================
 
         # Add options widgets to optionsFrame:
         option_label = QLabel("Chessboard Options:")
@@ -598,6 +646,96 @@ class CameraWidget (QWidget):
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
+    #======== new functions ============
+    
+    # Slot function based on radio selection state
+
+    def update_capture_button_state(self):
+        # First, disconnect all previously connected signals to avoid multiple connections.
+        try:
+            self.captureButton1.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
+
+        if self.input_images.isChecked():
+            self.captureButton1.setEnabled(True)
+            self.captureButton1.setText("Load Images")
+            self.captureButton1.clicked.connect(self.select_directory_and_load_images)
+        elif self.input_camera.isChecked():
+            self.captureButton1.setEnabled(True)
+            self.captureButton1.setText("Start Capture")
+            self.captureButton1.clicked.connect(self.start_capture) 
+        else:
+            self.captureButton1.setEnabled(False)
+
+    #====================================
+    # Browse input folder for images 
+    def select_directory_and_load_images(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory", options=options)
+        
+        if directory:
+            self.image_files = glob.glob(os.path.join(directory, '*.png')) + \
+                               glob.glob(os.path.join(directory, '*.jpg')) + \
+                               glob.glob(os.path.join(directory, '*.bmp'))
+            self.image_files.sort()  # Optional: Sort the files
+
+            # Print the files found
+            print(f"Found {len(self.image_files)} files:")
+            for file in self.image_files:
+                print(file)
+
+            # Disable Load Images button
+            self.captureButton1.setEnabled(False)
+
+            self.load_next_image()
+    
+    def load_next_image(self):
+        self.current_image_index += 1
+        if self.current_image_index < len(self.image_files):
+            # Print which image is being loaded and its index
+            print(f"Loading image {self.current_image_index + 1}/{len(self.image_files)}: {self.image_files[self.current_image_index]}")
+            self.load_image_local(self.image_files[self.current_image_index])
+        else:
+            print("No more images in the directory.")
+
+            # Disable input (TESTING)
+            #self.cameraFrame.mousePressEvent = None
+            #self.cameraFrame.keyPressEvent = None
+
+            # GOTO NEXT -> Press DONE
+
+    def load_image_local(self, file_name):
+        if file_name:
+            # Image loading and processing logic here
+            self.cv_image = cv2.imread(file_name)
+            self.cv_image_rgb = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2RGB)  # Corrected color conversion
+
+            # Covert to Pixmap and other operations...
+            pixmap = self.imageToPixmap(self.cv_image_rgb)
+
+            # Set loaded image in CameraFrame
+            self.cameraFrame.setPixmap(pixmap)
+            self.cameraFrame.setScaledContents(False)
+
+            if self.cameraFrame.pixmap() is not None:
+                self.processoutputWindow.setText("Image loaded")
+                
+                self.update_image_feed(self.cv_image) 
+
+            else:
+                self.processoutputWindow.setText("Problem displaying image")
+
+    # This is working when using general name 
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Space):
+            self.load_next_image()
+
+
+    #====================================
+
     def start_capture(self):
         global no_of_columns, no_of_rows, square_size
 
@@ -648,6 +786,47 @@ class CameraWidget (QWidget):
 
         return QPixmap.fromImage(img)
     
+
+    def update_image_feed(self, image):
+        org_image = image.copy()
+
+        # Add: if not self.test_started: -> update inverted_frame to corrected frame
+        if self.test_calibration == True:
+            # Print loaded camera matix
+            self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+            print("\n Camera matrix used for testing:")
+            print(self.camera_matrix)
+
+            # Undistort frame using camera matrix and dist coeff
+            undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            #image = undistorted_frame # cheesey replace
+            undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+            self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
+            self.cameraFrame.setPixmap(self.pixmap)
+
+        else:
+            #org_image = self.imageToPixmap(image)
+            ret_corners, corners, frame_with_corners = self.detectCorners(image, no_of_columns, no_of_rows)
+
+            if ret_corners:
+                # Display the image with corners
+                frame_with_corners = cv2.cvtColor(frame_with_corners, cv2.COLOR_BGR2RGB)
+                self.pixmap = self.imageToPixmap(frame_with_corners)
+                self.cameraFrame.setPixmap(self.pixmap)
+                # Only save when not testing
+                if self.test_calibration != True:
+                    self.save_screenshot(org_image)  # Save original Frame
+            else:
+                # Display the original image
+                org_image = cv2.cvtColor(org_image, cv2.COLOR_BGR2RGB) 
+                self.pixmap = self.imageToPixmap(org_image)
+                self.cameraFrame.setPixmap(self.pixmap)
+
+            # Ensure the image does not scales with the label -> issue with aspect ratio TODO
+        self.cameraFrame.setScaledContents(False)
+        self.update()
+
+    
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
         ret, frame = self.cap.read()  # read frame from webcam
@@ -669,7 +848,7 @@ class CameraWidget (QWidget):
                     #self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
                     print ("Capturing in", self.countdown_seconds, "seconds...")
                 elif ret_corners and self.countdown_seconds == 0:
-                    self.save_screenshot(original_inverted_frame)  # Have to save original Frame
+                    self.save_screenshot(original_inverted_frame)  # Save original Frame
                     self.countdown_seconds = 3  # Reset the countdown after saving
 
                 if ret_corners:
@@ -680,6 +859,8 @@ class CameraWidget (QWidget):
                     # Display the original frame
                     self.pixmap = self.CameraToPixmap(frame_inverted)
                     self.cameraFrame.setPixmap(self.pixmap)
+
+                # TODO / Check where to store 
 
             # Ensure the image does not scales with the label -> issue with aspect ratio TODO
             self.cameraFrame.setScaledContents(False)
@@ -750,7 +931,8 @@ class CameraWidget (QWidget):
             self.countdown_timer.stop() # Stop countdown
 
             # Start Calibration
-            self.perform_calibration()
+            # Do i need to start perform calib here again? -> move to test_cam calibration
+            #self.perform_calibration()
 
             # Update button text
             self.captureButton1.setText("Capture Finished")
@@ -764,6 +946,12 @@ class CameraWidget (QWidget):
             self.doneButton1.clicked.connect(self.test_calibration) # change connect to calibartion test
 
     def perform_calibration(self):
+        ############################################################################################################
+        # data and intrinsic / extrinsic values get saved at every step, stop + test + next phase TODO add checks
+        # use self.test_started = True
+        print(self.test_started)
+        ############################################################################################################
+
         # Camera calibration to return calibration parameters (camera_matrix, distortion_coefficients)
         print("Start Calibration")
 
@@ -787,11 +975,10 @@ class CameraWidget (QWidget):
                 ret_corners, corners, _ = self.detectCorners(frame, no_of_columns, no_of_rows)
 
                 if ret_corners:
-                    # Assuming that the chessboard is fixed on the (0, 0, 0) plane
                     object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
                     image_points.append(corners)
 
-        # check with min_cap for minimum images needed for calibration (Default is 3)
+        # check with min_cap for minimum images needed for calibration (Default should be 10) -> 3 for now
         if len(object_points) >= min_cap:
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
@@ -817,32 +1004,38 @@ class CameraWidget (QWidget):
                 self.camera_dist_coeff = distortion_coefficients
 
                 # Save intrinsic parameters to intrinsic.txt
-                with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
-                    file.write("Camera Matrix:\n")
-                    file.write(str(camera_matrix))
-                    file.write("\n\nDistortion Coefficients:\n")
-                    file.write(str(distortion_coefficients))
+                ###########################
+                # Only save at first stage 
+                ###########################
+                if self.test_started == False:
+                    with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                        file.write("Camera Matrix:\n")
+                        file.write(str(camera_matrix))
+                        file.write("\n\nDistortion Coefficients:\n")
+                        file.write(str(distortion_coefficients))
 
-                self.outputWindow.setText(f"Rotation Vectors:{rvecs}")
-                print("\n Rotation Vectors:")
-                print(rvecs)
+                    self.outputWindow.setText(f"Rotation Vectors:{rvecs}")
+                    print("\n Rotation Vectors:")
+                    print(rvecs)
 
-                self.outputWindow.setText(f"Translation Vectors:{tvecs}")
-                print("\n Translation Vectors:")
-                print(tvecs)
+                    self.outputWindow.setText(f"Translation Vectors:{tvecs}")
+                    print("\n Translation Vectors:")
+                    print(tvecs)
 
-                # Save extrinsic parameters to extrinsic.txt
-                with open(f"./output/extrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
-                    for i in range(len(rvecs)):
-                        file.write(f"\n\nImage {i+1}:\n")
-                        file.write(f"Rotation Vector:\n{rvecs[i]}\n")
-                        file.write(f"Translation Vector:\n{tvecs[i]}")
-                
-                self.outputWindow.setText(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
-                print(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
+                    # Save extrinsic parameters to extrinsic.txt
+                    with open(f"./output/extrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                        for i in range(len(rvecs)):
+                            file.write(f"\n\nImage {i+1}:\n")
+                            file.write(f"Rotation Vector:\n{rvecs[i]}\n")
+                            file.write(f"Translation Vector:\n{tvecs[i]}")
+                    
+                    self.outputWindow.setText(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
+                    print(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
 
             else:
                 print("Camera Calibration failed")
+        else:
+            print(f"Need {min_cap} images with corners, only {len(object_points)} found")
 
     def generate_object_points(self, columns, rows, square_size):
         # Generate a grid of 3D points representing the corners of the chessboard
@@ -856,17 +1049,26 @@ class CameraWidget (QWidget):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
 
+        # Start Calibration again also allow it to save intrinsic / extrinsic output files once
+        self.perform_calibration()
+
+        # Set test boolean to prevent mutiple saves
+        self.test_started = True
+
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....")
 
-        # Set test boolean
-        self.test_started = True
+        # Start update_camera_feed again when using camera feed (TESTING)
+        if self.input_camera.isChecked():      
+            self.timer.start(100) # Start camera feed
 
-        # Start update_camera_feed again
-        self.timer.start(100) # Start camera feed
+        if self.input_images.isChecked():
+            #Load images again (index should be -1 again)
+            self.current_image_index = -1
+            self.load_next_image() # Loads First image in index -> not undistort TODO
 
-        if self.cal_imported == False:
-            # Update DONE button to Test Calibration
+        if self.cal_imported == False and self.cal_saved == False: # TRY to prevent double save
+            # Update Test Calibration to Save to File
             self.doneButton1.setText("Save to File")
             self.doneButton1.clicked.connect(self.save_calibration) # change connect to calibartion test
         else:
@@ -889,7 +1091,7 @@ class CameraWidget (QWidget):
             return frame
         
     def save_calibration(self):
-        # TODO verify why save_calibration is called when CTRL-D is pressed
+        # TODO verify why save_calibration is called when CTRL-D is pressed or when going to De-warp next step 
         print("Saving Calibration parameters to file")
 
         # Emit the signal with the updated status text
@@ -915,6 +1117,9 @@ class CameraWidget (QWidget):
 
             # Emit the signal with the updated status text
             self.update_status_signal.emit("Calibration file Saved")
+
+            # Self calibration saved to True
+            self.cal_saved = True
             
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
@@ -962,9 +1167,9 @@ class CameraWidget (QWidget):
             if self.imageFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
 
-                # Prevent input until started
-                self.imageFrame.mousePressEvent = None
-                self.imageFrame.keyPressEvent = None
+                # Prevent input until started (TODO To Test)
+                #self.imageFrame.mousePressEvent = None
+                #self.imageFrame.keyPressEvent = None
 
             else:
                 self.processoutputWindow.setText("Problem displaying image")
@@ -1310,7 +1515,8 @@ class CameraWidget (QWidget):
                 self.field_image_selected = None
                 
             elif event.key() == Qt.Key_3:
-                self.selected_point = 3 # should be 2 TODO
+                #self.selected_point = 3 # should be 2 TODO
+                self.selected_point = 2
                 print("Selected landmark 3")
                 self.processoutputWindow.setText(f"Landmark 3 selected" )
 
@@ -1333,7 +1539,8 @@ class CameraWidget (QWidget):
                 self.field_image_selected = None             
 
             elif event.key() == Qt.Key_4:
-                self.selected_point = 2 # should be 3 TODO
+                #self.selected_point = 2 # should be 3 TODO
+                self.selected_point = 3
                 print("Selected landmark 4")
                 self.processoutputWindow.setText(f"Landmark 4 selected" )
 
@@ -1612,7 +1819,7 @@ class CamCalMain(QMainWindow):
                     self.camera_widget.update_status_signal.emit(f"Calibration parameters loaded from {file_name}")
                     print(f"Calibration parameters loaded from {file_name}")
 
-                    # Set tracker to True in camera_widget, needed in test_calibration
+                    # Set tracker to True in camera_widget, needed in test_cam calibration
                     self.camera_widget.cal_imported = True
 
                     # Update button text

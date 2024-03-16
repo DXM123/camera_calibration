@@ -2,7 +2,8 @@
 no_of_columns: 7  # number of columns of your Checkerboard
 no_of_rows: 7  # number of rows of your Checkerboard
 square_size: 27.0  # size of square on the Checkerboard in mm -> This is no longer required?
-min_cap: 3  # minimum or images to be collected by capturing (Default is 10), minimum is 3
+min_cap: 3  # minimum or images to be collected by capturing (Default is 10)
+cam_height: 75 # in cm to center of lens
 
 # Assuming the soccer field is 22 x 14 meters - old
 soccer_field_width: 22

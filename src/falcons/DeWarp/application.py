@@ -98,7 +98,7 @@ class CamCalMain(QMainWindow):
                     self.camera_widget.update_status_signal.emit(f"Calibration parameters loaded from {file_name}")
                     print(f"Calibration parameters loaded from {file_name}")
 
-                    # Set tracker to True in camera_widget, needed in test_calibration
+                    # Set tracker to True in camera_widget, needed in test_cam_calibration
                     self.camera_widget.cal_imported = True
 
                     # Update button text

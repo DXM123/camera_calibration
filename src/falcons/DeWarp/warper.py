@@ -23,8 +23,8 @@ class Warper(object):
             height, (int, float)
         ), "Width and height should be numerical values."
         assert isinstance(supersample, (int, float)), "Supersample should be a numerical value."
-        self.width = width
-        self.height = height
+        #self.width = width
+        #self.height = height
         self.supersample = supersample
 
         self.points = points
@@ -57,7 +57,7 @@ class Warper(object):
                 img, self.M, (self.width * self.supersample, self.height * self.supersample)
             )
 
-        # TODO is this needed ???
+        # TODO is this needed ??? Supersample is a factor by which the image is scaled up for the transformation. This can help reduce aliasing.
         if self.supersample == 1:
             if out == None:
                 return self.dst

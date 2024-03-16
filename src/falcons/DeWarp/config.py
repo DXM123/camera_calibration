@@ -11,7 +11,8 @@ class DeWarpConfig:
     no_of_columns: int  # number of columns of your Checkerboard
     no_of_rows: int  # number of rows of your Checkerboard
     square_size: float  # size of square on the Checkerboard in mm -> TODO: This is no longer required?
-    min_cap: int  # minimum or images to be collected by capturing (Default is 10), minimum is 3
+    min_cap: int  # minimum or images to be collected by capturing (Default is 10)
+    cam_height: int # in cm to center of lens
 
     # Assuming the soccer field is 22 x 14 meters - old
     soccer_field_width: float
