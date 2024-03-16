@@ -435,6 +435,7 @@ class CameraWidget(QWidget):
             self.captureButton1.setEnabled(False)
 
     #====================================
+            
     # Browse input folder for images 
     def select_directory_and_load_images(self):
         options = QFileDialog.Options()
@@ -550,16 +551,13 @@ class CameraWidget(QWidget):
         return QPixmap.fromImage(img)
     
     def update_image_feed(self, image):
-        # Read user-input values for columns, rows, and square size
-        self.no_of_columns = int(self.columnsInput.text())
-        self.no_of_rows = int(self.rowsInput.text())
-        self.square_size = float(self.squareSizeRow.text())
-
         # Save original image
         org_image = image.copy()
 
+        print(f"test_calibration is set to: {self.test_started}")
+
         # Add: if not self.test_started: -> update inverted_frame to corrected frame
-        if self.test_calibration == True:
+        if self.test_started == True:
             # Print loaded camera matix
             self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
             print("\n Camera matrix used for testing:")
@@ -582,7 +580,7 @@ class CameraWidget(QWidget):
                 self.pixmap = self.imageToPixmap(frame_with_corners)
                 self.cameraFrame.setPixmap(self.pixmap)
                 # Only save when not testing
-                if self.test_calibration != True:
+                if self.test_started != True:
                     self.save_screenshot(org_image)  # Save original Frame
             else:
                 # Display the original image
@@ -597,12 +595,23 @@ class CameraWidget(QWidget):
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
         ret, frame = self.cap.read()  # read frame from webcam
+
+        print(f"test_calibration is set to: {self.test_started}")
+
         if ret:  # if frame captured successfully
             frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
             original_inverted_frame = frame_inverted.copy()  # Store the original frame
 
             # Add: if not self.test_started: -> update inverted_frame to corrected frame
-            if self.test_calibration == True:
+            if self.test_started == True:
+
+                # Print loaded camera matix
+                self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+
+                # Debug print for camera matrix and distortion coefficients
+                print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+                print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
+
                 undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 frame_inverted = undistorted_frame  # cheesey replace
 
@@ -720,11 +729,8 @@ class CameraWidget(QWidget):
             self.doneButton1.clicked.connect(self.test_calibration)  # change connect to calibartion test
 
     def perform_calibration(self):
-        ############################################################################################################
-        # data and intrinsic / extrinsic values get saved at every step, stop + test + next phase TODO add checks
-        # use self.test_started = True
-        print(self.test_started)
-        ############################################################################################################
+        # Is Self test started
+        print(f"test_calibration is set to: {self.test_started}")
 
         # Camera calibration to return calibration parameters (camera_matrix, distortion_coefficients)
         print("Start Calibration")
@@ -1391,6 +1397,10 @@ class CameraWidget(QWidget):
 
                 # Perform pwarp at every key press to update frame
                 # self.warper_result = self.dewarp(self.cv_image.copy()) # return warper
+
+                # Debug print for camera matrix and distortion coefficients
+                print(f"Camera Matrix:\n{self.camera_matrix}")
+                print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
                 # Apply camera correction if any set
                 undistorted_frame = self.undistort_frame(

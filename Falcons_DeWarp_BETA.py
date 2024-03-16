@@ -210,7 +210,7 @@ class Draw_SoccerField:
 ################# Perspective Warp Classes ################# 
 
 class Warper(object):
-    def __init__(self,points,width=640,height=480,supersample=2,interpolation=None): #TODO make widt and height dynamic based in image
+    def __init__(self,points,width=640,height=480,supersample=2,interpolation=None):
         self.points = points
         #self.width  = width
         #self.height = height
@@ -222,7 +222,6 @@ class Warper(object):
         print(f"SS:{self.supersample}")  # Access the supersample attribute of the warper instance
 
         # Collected points
-        #self.pts1 = np.float32([points[0],points[1],points[3],points[2]]) # Odd order ! TODO
         self.pts1 = np.float32([points[0],points[1],points[2],points[3]]) 
 
         print("self.pts1:", self.pts1)
@@ -242,7 +241,7 @@ class Warper(object):
         # Update self.pts2 with the FCS landmarks 2,0 6,0 0,2 0,6 
         # self.pts2 = np.float32([FCS02, FCS06, FCS60, FCS20]) # mirror
         # Need to be global? Now have to add same to CameraWidget Class TODO
-        self.pts2 = np.float32([FCS20, FCS60, FCS06, FCS02]) # Odd order ofcourse but looks ok TODO
+        self.pts2 = np.float32([FCS20, FCS60, FCS06, FCS02])
 
         print("self.pts2:", self.pts2)
 
@@ -396,7 +395,6 @@ class CameraWidget (QWidget):
 
         # Set alignment to center the text within the QLabel
         self.cameraFrame.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
-
         self.cameraFrame.resize(640, 480) # start value
         self.cameraFrame.setFrameShape(QFrame.Box)
         self.tab1inner.layout.addWidget(self.cameraFrame)
@@ -670,6 +668,7 @@ class CameraWidget (QWidget):
             self.captureButton1.setEnabled(False)
 
     #====================================
+    
     # Browse input folder for images 
     def select_directory_and_load_images(self):
         options = QFileDialog.Options()
@@ -722,7 +721,6 @@ class CameraWidget (QWidget):
 
             if self.cameraFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
-                
                 self.update_image_feed(self.cv_image) 
 
             else:
@@ -732,7 +730,6 @@ class CameraWidget (QWidget):
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Space):
             self.load_next_image()
-
 
     #====================================
 
@@ -786,16 +783,20 @@ class CameraWidget (QWidget):
 
         return QPixmap.fromImage(img)
     
-
     def update_image_feed(self, image):
+        # Save original image
         org_image = image.copy()
 
+        print(f"test_calibration is set to: {self.test_started}")
+
         # Add: if not self.test_started: -> update inverted_frame to corrected frame
-        if self.test_calibration == True:
+        if self.test_started == True:
             # Print loaded camera matix
             self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
-            print("\n Camera matrix used for testing:")
-            print(self.camera_matrix)
+
+            # Debug print for camera matrix and distortion coefficients
+            print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+            print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
             # Undistort frame using camera matrix and dist coeff
             undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
@@ -814,7 +815,7 @@ class CameraWidget (QWidget):
                 self.pixmap = self.imageToPixmap(frame_with_corners)
                 self.cameraFrame.setPixmap(self.pixmap)
                 # Only save when not testing 
-                if self.test_calibration != True:
+                if self.test_started != True:
                     self.save_screenshot(org_image)  # Save original Frame
             else:
                 # Display the original image
@@ -826,18 +827,29 @@ class CameraWidget (QWidget):
         self.cameraFrame.setScaledContents(False)
         self.update()
 
-    
+
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
         ret, frame = self.cap.read()  # read frame from webcam
+
+        print(f"test_calibration is set to: {self.test_started}")
+
         if ret:  # if frame captured successfully
             frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
             original_inverted_frame = frame_inverted.copy()  # Store the original frame
 
             # Add: if not self.test_started: -> update inverted_frame to corrected frame
-            if self.test_calibration == True:
-                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                    frame_inverted = undistorted_frame # cheesey replace
+            if self.test_started == True:
+
+                # Print loaded camera matix
+                self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+
+                # Debug print for camera matrix and distortion coefficients
+                print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+                print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
+
+                undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                frame_inverted = undistorted_frame # cheesey replace
 
             if self.capture_started:
                 # Call detectCorners function
@@ -946,12 +958,9 @@ class CameraWidget (QWidget):
             self.doneButton1.clicked.connect(self.test_calibration) # change connect to calibartion test
 
     def perform_calibration(self):
-        ############################################################################################################
-        # data and intrinsic / extrinsic values get saved at every step, stop + test + next phase TODO add checks
-        # use self.test_started = True
-        print(self.test_started)
-        ############################################################################################################
-
+        # Is Self test started
+        print(f"test_calibration is set to: {self.test_started}")
+        
         # Camera calibration to return calibration parameters (camera_matrix, distortion_coefficients)
         print("Start Calibration")
 
@@ -1004,9 +1013,6 @@ class CameraWidget (QWidget):
                 self.camera_dist_coeff = distortion_coefficients
 
                 # Save intrinsic parameters to intrinsic.txt
-                ###########################
-                # Only save at first stage 
-                ###########################
                 if self.test_started == False:
                     with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
                         file.write("Camera Matrix:\n")
@@ -1076,7 +1082,6 @@ class CameraWidget (QWidget):
             self.doneButton1.setText("Continue to De-Warp")
             self.doneButton1.clicked.connect(self.start_pwarp) # change connect to calibartion test 
              
-
     def undistort_frame(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix is available
         if self.camera_matrix is not None and self.camera_dist_coeff is not None:
@@ -1179,8 +1184,6 @@ class CameraWidget (QWidget):
         # Stop Camera
         self.timer.stop() # Should not be here ! works for now since only images are used
 
-        # Set Mouse Events
-        
         # Check if the pixmap is set on the Image Frane
         if self.imageFrame.pixmap() is not None:
 
@@ -1400,7 +1403,6 @@ class CameraWidget (QWidget):
         self.startButtonPwarp.setText("Save to binary file")
         self.startButtonPwarp.clicked.connect(self.save_prep_mat_binary)
 
-
         # For now Quit App
         #self.startButtonPwarp.setText("DONE")
         #self.startButtonPwarp.clicked.connect(self.close_application) # close when done -> now closes directly without showing DONE
@@ -1576,6 +1578,10 @@ class CameraWidget (QWidget):
 
                 # Perform pwarp at every key press to update frame
                 # self.warper_result = self.dewarp(self.cv_image.copy()) # return warper
+
+                # Debug print for camera matrix and distortion coefficients
+                print(f"Camera Matrix:\n{self.camera_matrix}")
+                print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
                 # Apply camera correction if any set
                 undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
