@@ -196,8 +196,6 @@ class CameraWidget(QWidget):
         self.input_camera = QRadioButton("CAM")
         self.input_network = QRadioButton("Network")
         self.input_images = QRadioButton("Images") 
-        
-        # If switch to images then change "Start Capture" Button to Load Images
 
         # Set "USB" as the default option
         self.input_camera.setChecked(True)
@@ -611,10 +609,16 @@ class CameraWidget(QWidget):
                 print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
+                if self.input_images.isChecked():
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+
                 # Add Selection option for Fish-eye TODO
                 #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                frame_inverted = undistorted_frame  # cheesey replace
+                #undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    
+                frame_inverted = undistorted_frame # cheesey replace
 
             if self.capture_started:
                 # Call detectCorners function
@@ -671,7 +675,6 @@ class CameraWidget(QWidget):
         if ret:
             print("Corners detected successfully!")
             # Now Store Object Points 
-            #self.objpoints.append(self.objp)
             self.object_points.append(self.objp)
 
             # Refining pixel coordinates for given 2d points.
@@ -679,7 +682,6 @@ class CameraWidget(QWidget):
             cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
 
             ## Now Store Corners Detected
-            #imgpoints.append(corners)
             self.image_points.append(corners)
 
             # draw and display the chessboard corners
@@ -740,25 +742,21 @@ class CameraWidget(QWidget):
             self.doneButton1.clicked.connect(self.test_calibration)  # change connect to calibartion test
 
     def perform_calibration(self):
-        # Is Self test started
-        print(f"test_calibration is set to: {self.test_started}")
-
-        # Camera calibration to return calibration parameters (camera_matrix, distortion_coefficients)
+        print(f"Test_calibration is set to: {self.test_started}")
         print("Start Calibration")
+        self.update_status_signal.emit("Calibration in progress...")
 
-        # Emit the signal with the updated status text
-        self.update_status_signal.emit("Calibration in progess...")
+        # At this stage object_points and image_points are alread available when detect_corners was ran for loading images / frames etc
+        # Clear self.object_points and self.image_points to detect again?
+        self.object_points = []  # 3D points in real world space
+        self.image_points = []   # 2D points in image plane
 
-        # Load saved images and find chessboard corners
-        image_files = sorted(os.listdir("output"))  # TODO replace output with variable
+        image_files = sorted(os.listdir("output"))  # Now using output folder instead of input folder
+
         for file_name in image_files:
             if file_name.startswith("corner_") and file_name.endswith(".png"):
                 file_path = os.path.join("output", file_name)
-
-                # Load the image
                 frame = cv2.imread(file_path)
-
-                # Detect corners
                 ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
 
                 ###################################################################################################
@@ -772,6 +770,7 @@ class CameraWidget(QWidget):
         if len(self.object_points) >= self.min_cap:
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
             # Perform camera calibration
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
                 self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
@@ -831,10 +830,12 @@ class CameraWidget(QWidget):
         print("Start Calibration")
         self.update_status_signal.emit("Calibration in progress...")
 
-        image_files = sorted(os.listdir("output"))  # Now using output folder instead of input folder
-
         # At this stage object_points and image_points are alread available when detect_corners was ran for loading images / frames etc
-        # Only needed ....
+        # Clear self.object_points and self.image_points to detect again?
+        self.object_points = []  # 3D points in real world space
+        self.image_points = []   # 2D points in image plane
+
+        image_files = sorted(os.listdir("output"))  # Now using output folder instead of input folder
         
         for file_name in image_files:
             if file_name.startswith("corner_") and file_name.endswith(".png"):
@@ -842,11 +843,6 @@ class CameraWidget(QWidget):
                 frame = cv2.imread(file_path)
                 ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
 
-                #if ret_corners:
-                #    subpix_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1) # move from here TODO
-                #    self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
-                #    corners_subpix = cv2.cornerSubPix(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), corners, (3,3), (-1,-1), subpix_criteria)
-                #    self.image_points.append(corners_subpix)
                 if ret_corners:
                     #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
                     #self.image_points.append(corners)
@@ -858,11 +854,6 @@ class CameraWidget(QWidget):
             img_points = np.array(self.image_points)
             _img_shape = frame.shape[:2]
             
-            # Fisheye calibration parameters initialization
-            #K = np.zeros((3, 3))
-            #D = np.zeros((4, 1))
-            #rvecs = []
-            #tvecs = []
             calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
 
             N_OK = len(obj_points)
@@ -938,12 +929,21 @@ class CameraWidget(QWidget):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
 
-        # Start Calibration again also allow it to save intrinsic / extrinsic output files once
-        #self.perform_calibration()
-        self.perform_calibration_fisheye()
+        #######################################################################################
+        #        Is this still required or first set test_started = True !!?? TODO
 
         # Set test boolean to prevent mutiple saves
-        self.test_started = True
+        self.test_started = True # Now now intrensic and extrensic parameters saved (but does prevent double saves)
+        #######################################################################################
+
+        # Start Calibration again also allow it to save intrinsic / extrinsic output files once -> Not working due to test_started value = True
+        if self.input_images.isChecked():
+            self.perform_calibration_fisheye()
+        else:
+            self.perform_calibration()
+
+        # Set test boolean to prevent mutiple saves
+        #self.test_started = True
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....") 
@@ -960,11 +960,11 @@ class CameraWidget(QWidget):
         if self.cal_imported == False and self.cal_saved == False: # TRY to prevent double save
             # Update Test Calibration to Save to File
             self.doneButton1.setText("Save to File")
-            self.doneButton1.clicked.connect(self.save_calibration)  # change connect to calibartion test
+            self.doneButton1.clicked.connect(self.save_calibration)
         else:
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
-            self.doneButton1.clicked.connect(self.start_pwarp)  # change connect to calibartion test
+            self.doneButton1.clicked.connect(self.start_pwarp)
 
     def undistort_frame(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix is available
@@ -1042,6 +1042,11 @@ class CameraWidget(QWidget):
             # Stop Camera feed
             self.timer.stop()
 
+            # Stop Input
+            self.cameraFrame.keyPressEvent = None
+            self.cameraFrame.mousePressEvent = None
+            self.cameraFrame.releaseMouse()
+
         except Exception as e:
             # Handle any exceptions that may occur during file writing
             print(f"Error saving calibration file: {e}")
@@ -1089,14 +1094,12 @@ class CameraWidget(QWidget):
                 self.processoutputWindow.setText("Problem displaying image")
 
     def start_pwarp(self):
-        # Stop Camera
-        self.timer.stop()  # Should not be here ! works for now since only images are used
+        # Stop Camera -> also stopped after save
+        #self.timer.stop() # Should not be here ! works for now since only images are used
 
-        # Set Mouse Events
-
-        # TODO Check if any pixmap is set before continuing
         # Check if the pixmap is set on the Image Frane
         if self.imageFrame.pixmap() is not None:
+
             # Temp disable Start button untill all 4 points are collected TODO
             self.startButtonPwarp.setDisabled(True)  # Should not be here !
 
@@ -1117,12 +1120,18 @@ class CameraWidget(QWidget):
                     # Disable Load image Button when import succeeded and dewarp started
                     self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
 
-                    if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
+                    if len(frame.shape) == 3:  # Verify if valid frame shape
+
                         self.warper_result = self.dewarp(frame)  # return warper
+
+                        if self.input_images.isChecked():
+                            undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                        else:
+                            undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                         # Apply camera correction if any set (add selection for fish eye TODO)
                         #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                        undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                        # undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
@@ -1134,8 +1143,6 @@ class CameraWidget(QWidget):
                         print("Dewarping process completed.")
                         self.update_status_signal.emit("Dewarping process completed.")
 
-                        # Update button text for next step
-                        #self.startButtonPwarp.setText("Tweak Landmarks")
                         ## Check if tweak already started to prevent overwrite button text
                         if not self.image_tuning_dewarp == True:
                             # Update button text for next step
@@ -1170,13 +1177,13 @@ class CameraWidget(QWidget):
                 # TODO
                 ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
 
-                if ret:  # if frame captured successfully
+                #if ret:  # if frame captured successfully
                     # frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
                     # original_inverted_frame = frame_inverted.copy()  # Store the original frame
                     # undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                     # dewarped_frame = self.warper.warp(undistorted_frame.copy())  # Perform dewarping
                     # self.display_dewarped_image(dewarped_frame)
-                    pass  # temp
+                #    pass  # temp
 
             elif self.network_dewarp == True:
                 # network_dewarp()
@@ -1184,6 +1191,8 @@ class CameraWidget(QWidget):
         else:
             # Disable the first tab (Camera Calibration)
             self.tabs.setTabEnabled(0, False) # Should not be here !
+
+            # Clear other stuff we dont need anymore for pwarp TODO
 
             # Switch to the second tab (Perspective-Warp)
             self.tabs.setCurrentIndex(1) # Should not be here !
@@ -1394,7 +1403,13 @@ class CameraWidget(QWidget):
             y = event.y()
 
             # Print the x, y coordinates
-            print(f"Mouse clicked at x: {x}, y: {y}")
+            # print(f"Mouse clicked at x: {x}, y: {y}")
+
+            # Debug Mouse events
+            print(f"Clicked at local coordinates: ({event.x()}, {event.y()})")
+            globalPos = self.mapToGlobal(event.pos())
+            print(f"Clicked at global coordinates: ({globalPos.x()}, {globalPos.y()})")
+            super().mousePressEvent(event)  # Call the parent class's event handler
 
             # Check if the pixmap is set on the Image Frane
             if self.imageFrame.pixmap() is not None:
