@@ -70,3 +70,7 @@ Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
     pip install -e .
     python -c "from falcons.DeWarp import run; run()"
     ```
+
+**Calibration Example:**
+
+![Screenshot from 2024-03-17 14-52-30](https://github.com/DXM123/camera_calibration/assets/19300348/9b223aeb-0b99-47c5-8f27-8c20b9219a41)
