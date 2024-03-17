@@ -50,6 +50,15 @@ class CameraWidget(QWidget):
         self.image_files = []
         self.current_image_index = -1  # Start with -1, so the first image is at index 0
 
+        # Object points for calibration
+        self.objp = np.zeros((1, self.config.no_of_columns * self.config.no_of_rows, 3), np.float32)
+        self.objp[0, :, :2] = np.mgrid[0:self.config.no_of_columns, 0:self.config.no_of_rows].T.reshape(-1, 2)
+
+        # Image  / frame characteristics 
+        self.frame_shape = None
+        self.object_points = []  # 3D points in real world space
+        self.image_points = []   # 2D points in image plane
+
         # Add a QTimer countdown timer
         self.countdown_timer = QTimer(self)
         self.countdown_timer.timeout.connect(self.update_countdown)
@@ -92,8 +101,6 @@ class CameraWidget(QWidget):
 
         # Initialize camera_distortion coefficients as None
         self.camera_dist_coeff = None
-
-        # Do i need rvecs and tvecs?
 
         # Define basic line thickness to draw soccer field
         self.line_thickness = 2
@@ -175,10 +182,6 @@ class CameraWidget(QWidget):
         self.optionsFrame = QWidget()
         self.optionsFrame.layout = QVBoxLayout(self.optionsFrame)
         self.optionsFrame.layout.setAlignment(Qt.AlignTop)  # Align the layout to the top
-        # self.optionsFrame.layout.addStretch(1)
-
-        # Set fixed width for optionsFrame
-        # self.optionsFrame.setFixedWidth(400)
 
         #============= Add new options USB / Image / Network like Tab2
 
@@ -199,7 +202,7 @@ class CameraWidget(QWidget):
         # Set "USB" as the default option
         self.input_camera.setChecked(True)
 
-        # Connect the toggled signal of radio buttons to a slot function
+        # Connect the toggled signal of radio buttons to a slot function, not for images
         self.input_images.toggled.connect(self.update_capture_button_state)
         self.input_network.toggled.connect(self.update_capture_button_state)
 
@@ -215,6 +218,8 @@ class CameraWidget(QWidget):
 
         self.optionsFrame.layout.addLayout(self.input_layout)
 
+        #===============================================================
+        # Add Camera Lens Options (Height and Fisheye toggle) (TODO)
         #===============================================================
 
         # Add options widgets to optionsFrame:
@@ -411,9 +416,6 @@ class CameraWidget(QWidget):
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
-    #======== new functions ============
-    
-    # Slot function based on radio selection state
 
     def update_capture_button_state(self):
         # First, disconnect all previously connected signals to avoid multiple connections.
@@ -433,8 +435,6 @@ class CameraWidget(QWidget):
             self.captureButton1.clicked.connect(self.start_capture) 
         else:
             self.captureButton1.setEnabled(False)
-
-    #====================================
             
     # Browse input folder for images 
     def select_directory_and_load_images(self):
@@ -499,9 +499,6 @@ class CameraWidget(QWidget):
         if event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Space):
             self.load_next_image()
 
-
-    #====================================
-
     def start_capture(self):
         if not self.capture_started:
             # Read user-input values for columns, rows, and square size
@@ -563,8 +560,9 @@ class CameraWidget(QWidget):
             print("\n Camera matrix used for testing:")
             print(self.camera_matrix)
 
-            # Undistort frame using camera matrix and dist coeff
-            undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            # Undistort frame using camera matrix and dist coeff (Add Selection option for Fish-Eye TODO)
+            #undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
             #image = undistorted_frame # cheesey replace
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
@@ -613,7 +611,9 @@ class CameraWidget(QWidget):
                 print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-                undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                # Add Selection option for Fish-eye TODO
+                #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 frame_inverted = undistorted_frame  # cheesey replace
 
             if self.capture_started:
@@ -670,13 +670,21 @@ class CameraWidget(QWidget):
 
         if ret:
             print("Corners detected successfully!")
+            # Now Store Object Points 
+            #self.objpoints.append(self.objp)
+            self.object_points.append(self.objp)
+
             # Refining pixel coordinates for given 2d points.
-            #cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            # cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+
+            ## Now Store Corners Detected
+            #imgpoints.append(corners)
+            self.image_points.append(corners)
 
             # draw and display the chessboard corners
             cv2.drawChessboardCorners(image, (columns, rows), corners, ret)
-
+        
             # Print the number of corners found
             print("Number of corners found:", len(corners))
 
@@ -701,6 +709,9 @@ class CameraWidget(QWidget):
 
         # Update the output window with the saved filename
         self.outputWindow.setText(f"Screenshot saved:\n{filename}\nTotal Images Collected: {self.ImagesCounter}")
+        #print(f"Frame Shape = {frame.shape[:2]}") # wrong way around
+        print(f"Frame Shape = (Width: {frame.shape[1]}, Height: {frame.shape[0]})")
+
         print(f"Screenshot saved:\n {filename}\nTotal Images Collected: {self.ImagesCounter}")
 
     # Check collected images with corners and start calibration if ok
@@ -716,9 +727,6 @@ class CameraWidget(QWidget):
         else:
             self.timer.stop()  # Stop camera feed
             self.countdown_timer.stop()  # Stop countdown
-
-            # Start Calibration
-            # self.perform_calibration()
 
             # Update button text
             self.captureButton1.setText("Capture Finished")
@@ -741,10 +749,6 @@ class CameraWidget(QWidget):
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Calibration in progess...")
 
-        # Lists to store object points and image points from all the images.
-        object_points = []  # 3D points in real world space
-        image_points = []  # 2D points in image plane.
-
         # Load saved images and find chessboard corners
         image_files = sorted(os.listdir("output"))  # TODO replace output with variable
         for file_name in image_files:
@@ -757,47 +761,43 @@ class CameraWidget(QWidget):
                 # Detect corners
                 ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
 
+                ###################################################################################################
                 if ret_corners:
-                    object_points.append(
-                        self.generate_object_points(self.no_of_columns, self.no_of_rows, self.square_size)
-                    )
-                    image_points.append(corners)
+                    #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
+                    #self.image_points.append(corners)
+                    print("Calibration Succesfull")
+                ###################################################################################################
 
         # check with min_cap for minimum images needed for calibration (Default should be 10) (3 for now)
-        if len(object_points) >= self.min_cap:
+        if len(self.object_points) >= self.min_cap:
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             # Perform camera calibration
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-                object_points, image_points, (frame.shape[1], frame.shape[0]), None, None
+                self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
             )
 
             if ret:  # if calibration was successfully
                 # Display the calibration results
                 self.outputWindow.setText(f"Camera matrix:{camera_matrix}")
-                print("\n Camera matrix:")
-                print(camera_matrix)
+                print(f"Camera matrix found:{camera_matrix}")
 
                 # Assign camera_matrix to the instance variable
                 self.camera_matrix = camera_matrix
 
                 self.outputWindow.setText(f"Distortion coefficient:{distortion_coefficients}")
-                print("\n Distortion coefficient:")
-                print(distortion_coefficients)
+                print(f"Distortion coefficient found:{distortion_coefficients}")
 
                 # Assign camera_distortion coefficient to the instance variable
                 self.camera_dist_coeff = distortion_coefficients
 
                 # Save intrinsic parameters to intrinsic.txt
-                ###########################
-                # Only save at first stage 
-                ###########################
                 if self.test_started == False:
                     with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
                         file.write("Camera Matrix:\n")
-                        file.write(str(camera_matrix))
+                        file.write(str(self.camera_matrix))
                         file.write("\n\nDistortion Coefficients:\n")
-                        file.write(str(distortion_coefficients))
+                        file.write(str(self.camera_dist_coeff))
 
                     self.outputWindow.setText(f"Rotation Vectors:{rvecs}")
                     print("\n Rotation Vectors:")
@@ -820,15 +820,118 @@ class CameraWidget(QWidget):
             else:
                 print("Camera Calibration failed")
         else:
-            print(f"Need {self.min_cap} images with corners, only {len(object_points)} found")
+            print(f"Need {self.min_cap} images with corners, only {len(self.object_points)} found")
         
 
-    def generate_object_points(self, columns, rows, square_size):
-        # Generate a grid of 3D points representing the corners of the chessboard
-        objp = np.zeros((columns * rows, 3), np.float32)
-        objp[:, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2)
-        objp *= square_size
+    
+    #######################################################################
 
+    def perform_calibration_fisheye(self):
+        print(f"test_calibration is set to: {self.test_started}")
+        print("Start Calibration")
+        self.update_status_signal.emit("Calibration in progress...")
+
+        image_files = sorted(os.listdir("output"))  # Now using output folder instead of input folder
+
+        # At this stage object_points and image_points are alread available when detect_corners was ran for loading images / frames etc
+        # Only needed ....
+        
+        for file_name in image_files:
+            if file_name.startswith("corner_") and file_name.endswith(".png"):
+                file_path = os.path.join("output", file_name)
+                frame = cv2.imread(file_path)
+                ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
+
+                #if ret_corners:
+                #    subpix_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1) # move from here TODO
+                #    self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
+                #    corners_subpix = cv2.cornerSubPix(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), corners, (3,3), (-1,-1), subpix_criteria)
+                #    self.image_points.append(corners_subpix)
+                if ret_corners:
+                    #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
+                    #self.image_points.append(corners)
+                    print("Calibration Succesfull")
+
+        if len(self.object_points) >= self.min_cap:  # Ensure there's enough data for calibration
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            obj_points = np.array(self.object_points)
+            img_points = np.array(self.image_points)
+            _img_shape = frame.shape[:2]
+            
+            # Fisheye calibration parameters initialization
+            #K = np.zeros((3, 3))
+            #D = np.zeros((4, 1))
+            #rvecs = []
+            #tvecs = []
+            calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
+
+            N_OK = len(obj_points)
+            K = np.zeros((3, 3))
+            D = np.zeros((4, 1))
+            rvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+            tvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+
+            try:
+                rms, K, D, rvecs, tvecs = cv2.fisheye.calibrate(
+                    obj_points,
+                    img_points,
+                    _img_shape[::-1],
+                    K,
+                    D,
+                    rvecs,
+                    tvecs,
+                    calibration_flags,
+                    (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
+                )
+
+                self.outputWindow.setText(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
+                print(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
+
+                self.camera_matrix = K
+                self.camera_dist_coeff = D
+
+                ########################COPY FROM ABOVE################################
+
+                # Save intrinsic parameters to intrinsic.txt
+                if self.test_started == False:
+                    with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                        file.write("Camera Matrix:\n")
+                        file.write(str(self.camera_matrix))
+                        file.write("\n\nDistortion Coefficients:\n")
+                        file.write(str(self.camera_dist_coeff))
+
+                    self.outputWindow.setText(f"Rotation Vectors:{rvecs}")
+                    print("\n Rotation Vectors:")
+                    print(rvecs)
+
+                    self.outputWindow.setText(f"Translation Vectors:{tvecs}")
+                    print("\n Translation Vectors:")
+                    print(tvecs)
+
+                    # Save extrinsic parameters to extrinsic.txt
+                    with open(f"./output/extrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                        for i in range(len(rvecs)):
+                            file.write(f"\n\nImage {i+1}:\n")
+                            file.write(f"Rotation Vector:\n{rvecs[i]}\n")
+                            file.write(f"Translation Vector:\n{tvecs[i]}")
+                    
+                    self.outputWindow.setText(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
+                    print(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
+
+                    ###########################
+
+            except cv2.error as e:
+                print(f"Calibration failed with error: {e}")
+
+        else:
+            print(f"Need at least {self.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
+
+    ######################################################################
+
+
+    def generate_object_points(self, columns, rows, square_size):
+        objp = np.zeros((1, columns * rows, 3), np.float32)
+        objp[0, :, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2) * square_size
         return objp
 
     def test_calibration(self):
@@ -836,7 +939,8 @@ class CameraWidget(QWidget):
         print("Testing Calibration")
 
         # Start Calibration again also allow it to save intrinsic / extrinsic output files once
-        self.perform_calibration()
+        #self.perform_calibration()
+        self.perform_calibration_fisheye()
 
         # Set test boolean to prevent mutiple saves
         self.test_started = True
@@ -874,6 +978,31 @@ class CameraWidget(QWidget):
             print("No camera matrix or distortion coefficient detected, showing original frame")
 
             return frame
+
+    ############################################################################################
+        
+    # When lens field of view is above 160 degree we need fisheye undistort function for opencv
+    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients):
+        # Check if camera_matrix and distortion_coefficients are available
+        if camera_matrix is not None and distortion_coefficients is not None:
+
+            # Store Frame Dimension
+            #DIM = frame.shape[:2]
+            _img_shape = frame.shape[:2]
+            DIM = _img_shape[::-1]
+            print(f"Frame Dimension (DIM) = {DIM}")
+
+            # Undistort and remap frame
+            map1, map2 = cv2.fisheye.initUndistortRectifyMap(camera_matrix, distortion_coefficients, np.eye(3), camera_matrix, DIM, cv2.CV_16SC2)
+            undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+            return undistorted_frame
+        else:
+            print("No camera matrix or distortion coefficient detected, showing original frame")
+            return frame
+        
+    #################################################################################################
+
 
     def save_calibration(self):
         # TODO verify why save_calibration is called when CTRL-D is pressed or when going to De-warp next step 
@@ -991,8 +1120,9 @@ class CameraWidget(QWidget):
                     if len(frame.shape) == 3:  # Check if it's a 3D array (color image)
                         self.warper_result = self.dewarp(frame)  # return warper
 
-                        # Apply camera correction if any set
-                        undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                        # Apply camera correction if any set (add selection for fish eye TODO)
+                        #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                        undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
@@ -1405,10 +1535,9 @@ class CameraWidget(QWidget):
                 print(f"Camera Matrix:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
-                # Apply camera correction if any set
-                undistorted_frame = self.undistort_frame(
-                    self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff
-                )
+                # Apply camera correction if any set ( Add Selection opion for Fish-Eye TODO)
+                #undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
 
                 # Perform pwarp at every key press to update frame
                 self.warper_result = self.dewarp(undistorted_frame.copy())  # return warper

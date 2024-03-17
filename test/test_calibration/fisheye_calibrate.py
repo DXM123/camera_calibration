@@ -7,7 +7,7 @@ import os
 
 # Run this script in the folder containing the .JPG images
 #CHECKERBOARD = (6, 9)
-CHECKERBOARD = (7, 7)
+CHECKERBOARD = (7, 7) # columns / # rows
 
 subpix_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
@@ -16,10 +16,11 @@ objp = np.zeros((1, CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
 objp[0, :, :2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
 
 _img_shape = None
-objpoints = []  # 3d points in real world space
+objpoints = []  # 3d points in real world spaceobjp
 imgpoints = []  # 2d points in image plane.
 images = glob.glob('*.jpg')
 
+# Loop through images
 for fname in images:
     img = cv2.imread(fname)
     if img is None:
@@ -28,9 +29,13 @@ for fname in images:
         _img_shape = img.shape[:2]
     else:
         assert _img_shape == img.shape[:2], "All images must share the same size."
+
+    # Find Corners using gray scale image
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
     #ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
     ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FILTER_QUADS + cv2.CALIB_CB_NORMALIZE_IMAGE) # Current Falcons CamCal option
+    
     if ret:
         objpoints.append(objp)
         cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), subpix_criteria)
@@ -46,6 +51,8 @@ if not objpoints or not imgpoints or len(objpoints) != len(imgpoints):
     print(f"Object points: {len(objpoints)}, Image points: {len(imgpoints)}")
     cv2.destroyAllWindows()
     exit(1)
+
+## Calibrate
 
 N_OK = len(objpoints)
 K = np.zeros((3, 3))
