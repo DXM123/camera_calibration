@@ -31,10 +31,6 @@ from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt, QTimer
 
 # Dependency OpenCV 4.x, PyQT5 + Numpy (Default in UBNT 22.04)
-# TODO Default disable tab2, only enable after finish Calibartion or loading Calibration JSON
-# TODO Add logic for usb, and network
-# TODO Optimize landmark selection selections
-# TODO Save to binairy cv mat file
 
 #Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns = 7  #number of columns of your Checkerboard
@@ -423,6 +419,9 @@ class CameraWidget (QWidget):
         self.optionsFrame.layout = QVBoxLayout(self.optionsFrame)
         self.optionsFrame.layout.setAlignment(Qt.AlignTop)  # Align the layout to the top
 
+        # Set fixed width for optionsFrame
+        self.optionsFrame.setFixedWidth(500)
+
         # Add options widgets to optionsFrame:
         input_label = QLabel("Input Options:")
         input_label.setFixedHeight(48)
@@ -508,7 +507,7 @@ class CameraWidget (QWidget):
         # Create Horizontal Box Layout for tab 2
         self.tab2.layout = QHBoxLayout(self.tab2)
 
-        # Create Vertical Box Layout for tab1 inner frame
+        # Create Vertical Box Layout for tab2 inner frame
         self.tab2inner = QWidget()
         self.tab2inner.layout = QVBoxLayout(self.tab2inner)
 
@@ -532,6 +531,12 @@ class CameraWidget (QWidget):
         self.imageFrame.setFocusPolicy(Qt.StrongFocus)
         self.tab2inner.layout.addWidget(self.imageFrame)
 
+        # Store the initial size for later use
+        self.initialTab1InnerSize = self.tab1inner.size()
+        self.initialTab2InnerSize = self.tab2inner.size()
+        print(f"tab2inner initial size: {self.initialTab2InnerSize}")
+        print(f"tab1inner initial size: {self.initialTab1InnerSize}")
+
         # Add Start De-warp Button last
         self.startButtonPwarp = QPushButton("START Perspective-Warp", self.tab2inner)
         self.startButtonPwarp.clicked.connect(self.start_pwarp)
@@ -546,7 +551,7 @@ class CameraWidget (QWidget):
         self.ProcessFrame.layout.setAlignment(Qt.AlignTop)  # Align the layout to the top
         #self.ProcessFrame.layout.addStretch(1)
 
-        # Set fixed width for optionsFrame
+        # Set fixed width for processFrame
         self.ProcessFrame.setFixedWidth(500)
 
         # Add options widgets to optionsFrame:
@@ -717,7 +722,21 @@ class CameraWidget (QWidget):
 
             # Set loaded image in CameraFrame
             self.cameraFrame.setPixmap(pixmap)
-            self.cameraFrame.setScaledContents(False)
+            self.cameraFrame.setScaledContents(False) # Never Scale
+
+            # Adjust cameraFrame size to match the pixmap size - Set Fixed Size like imageFrame
+            self.cameraFrame.setFixedSize(pixmap.size())
+
+            # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
+            # Get the width of cameraFrame
+            cameraFrameWidth = self.cameraFrame.size().width()
+
+            # Print the cameraFrame width
+            print(f"cameraFrame Width: {cameraFrameWidth}")
+
+            # Set the buttons to the same width as cameraFrame
+            self.doneButton1.setFixedWidth(cameraFrameWidth)
+            self.captureButton1.setFixedWidth(cameraFrameWidth)
 
             if self.cameraFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
@@ -1310,6 +1329,20 @@ class CameraWidget (QWidget):
             self.imageFrame.setPixmap(pixmap)
             self.imageFrame.setScaledContents(False) # Set to false to prevent issues with aspect ratio
 
+            # Adjust imageFrame size to exactly match the pixmap size needed for proper mouse x,y
+            self.imageFrame.setFixedSize(pixmap.size())
+
+            # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
+            # Get the width of cameraFrame
+            imageFrameWidth = self.imageFrame.size().width()
+
+            # Print the cameraFrame width
+            print(f"imageFrame Width: {imageFrameWidth}")
+
+            # Set the buttons to the same width as cameraFrame
+            self.startButtonPwarp.setFixedWidth(imageFrameWidth)
+            self.loadImage.setFixedWidth(imageFrameWidth)
+
             # check pixmap set is not none
             if self.imageFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
@@ -1330,12 +1363,6 @@ class CameraWidget (QWidget):
 
             # Temp disable Start button untill all 4 points are collected TODO
             self.startButtonPwarp.setDisabled(True) # Should not be here !
-
-            # Disable the first tab (Camera Calibration)
-            #self.tabs.setTabEnabled(0, False) # Should not be here !
-
-            # Switch to the second tab (Perspective-Warp)
-            #self.tabs.setCurrentIndex(1) # Should not be here !
 
             if self.image_dewarp == True:
                 print("Image Perspective Warp started")
@@ -1416,16 +1443,17 @@ class CameraWidget (QWidget):
 
             #########################################################################
 
-            # Reset Size and Clear other stuff we dont need anymore for pwarp TODO
-            #self.tabs.resize(300, 200)
-            #self.tab2.resize(300, 200)
-            #self.cameraFrame.resize(640, 480)
-            #self.imageFrame.resize(640, 480)  # resize a QLabel imageFrame
-
-            ##########################################################################
+            # Clear Image from self.imageFrame
+            self.cameraFrame.setPixmap(QPixmap())
+            self.imageFrame.setPixmap(QPixmap())         
 
             # Switch to the second tab (Perspective-Warp)
             self.tabs.setCurrentIndex(1) # Should not be here !
+
+            self.initialTab1InnerSizeCheck = self.tab1inner.size()
+            self.initialTab2InnerSizeCheck = self.tab2inner.size()
+            print(f"tab2inner current size: {self.initialTab2InnerSizeCheck}")
+            print(f"tab1inner current size: {self.initialTab1InnerSizeCheck}")
 
             print("No Image Loaded")
             self.processoutputWindow.setText("No Image loaded")
@@ -1616,7 +1644,7 @@ class CameraWidget (QWidget):
             # Check if the pixmap is set on the Image Frane
             if self.imageFrame.pixmap() is not None:
                 self.points.append((x, y))
-                self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
+                self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Might cause flickering
                 bgimage = cv2.rectangle(self.cv_image, (x, y), (x + 2, y + 2), (green), 2)
                 self.display_landmarks(bgimage)
             else:
