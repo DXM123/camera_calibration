@@ -804,7 +804,7 @@ class CameraWidget (QWidget):
         # Save original image
         org_image = image.copy()
 
-        print(f"test_calibration is set to: {self.test_started}")
+        #print(f"test_calibration is set to: {self.test_started}")
 
         # Add: if not self.test_started: -> update inverted_frame to corrected frame
         if self.test_started == True:
@@ -817,7 +817,13 @@ class CameraWidget (QWidget):
 
             # Undistort frame using camera matrix and dist coeff (Add Selection option for Fish-Eye TODO)
             #undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
-            undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            #undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+
+            # Not really needed since images now always use fisheye, but prep for fisheye toggle
+            if self.input_images.isChecked():
+                undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            else:
+                undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
             #image = undistorted_frame # cheesey replace
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
@@ -851,7 +857,7 @@ class CameraWidget (QWidget):
         # This method will be called at regular intervals by the timer
         ret, frame = self.cap.read()  # read frame from webcam
 
-        print(f"test_calibration is set to: {self.test_started}")
+        #print(f"test_calibration is set to: {self.test_started}")
 
         if ret:  # if frame captured successfully
             frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
@@ -1385,10 +1391,6 @@ class CameraWidget (QWidget):
                         else:
                             undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
-                        # Apply camera correction if any set (add selection for fish eye TODO)
-                        #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                        # undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
 
@@ -1567,7 +1569,9 @@ class CameraWidget (QWidget):
         print(f"Check UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
         print(f"Check cameraFrame| W: {self.cameraFrame.width()}, H: {self.cameraFrame.height()}, Supersample: {self.supersample}") # is using wrong values -> cameraFrame
 
+        #############################################################################
         # TODO is CameraFrame the best option? -> Image size when using images TODO
+        #############################################################################
         warper = Warper(points=self.points, width=self.cameraFrame.width, height=self.cameraFrame.height, supersample=self.supersample)
 
         return warper
@@ -1773,9 +1777,16 @@ class CameraWidget (QWidget):
                 print(f"Camera Matrix:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
+                # TODO Use original image without green landmarks
+
                 # Apply camera correction if any set ( Add Selection opion for Fish-Eye TODO)
                 #undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
-                undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                #undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+
+                if self.input_images.isChecked():
+                    undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
 
                 # Perform pwarp at every key press to update frame
                 self.warper_result = self.dewarp(undistorted_frame.copy()) # return warper
