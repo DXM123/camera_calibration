@@ -581,7 +581,13 @@ class CameraWidget(QWidget):
 
             # Undistort frame using camera matrix and dist coeff (Add Selection option for Fish-Eye TODO)
             #undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
-            undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            #undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+
+            # Not really needed since images now always use fisheye, but prep for fisheye toggle
+            if self.input_images.isChecked():
+                undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            else:
+                undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
             #image = undistorted_frame # cheesey replace
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
@@ -1586,7 +1592,13 @@ class CameraWidget(QWidget):
 
                 # Apply camera correction if any set ( Add Selection opion for Fish-Eye TODO)
                 #undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
-                undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                #undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+
+                # Not really needed since images now always use fisheye, but prep for fisheye toggle
+                if self.input_images.isChecked():
+                    undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
 
                 # Perform pwarp at every key press to update frame
                 self.warper_result = self.dewarp(undistorted_frame.copy())  # return warper
