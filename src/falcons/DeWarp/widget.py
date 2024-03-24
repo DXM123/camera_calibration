@@ -575,13 +575,11 @@ class CameraWidget(QWidget):
         # Add: if not self.test_started: -> update inverted_frame to corrected frame
         if self.test_started == True:
             # Print loaded camera matix
-            self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
-            print("\n Camera matrix used for testing:")
-            print(self.camera_matrix)
+            #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
 
-            # Undistort frame using camera matrix and dist coeff (Add Selection option for Fish-Eye TODO)
-            #undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
-            #undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            # Debug print for camera matrix and distortion coefficients
+            #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+            #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
             # Not really needed since images now always use fisheye, but prep for fisheye toggle
             if self.input_images.isChecked():
@@ -589,7 +587,7 @@ class CameraWidget(QWidget):
             else:
                 undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
-            #image = undistorted_frame # cheesey replace
+            #TODO Camera image is flipped when showing
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
             self.cameraFrame.setPixmap(self.pixmap)
@@ -630,20 +628,16 @@ class CameraWidget(QWidget):
             if self.test_started == True:
 
                 # Print loaded camera matix
-                self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+                #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
 
                 # Debug print for camera matrix and distortion coefficients
-                print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
-                print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
+                #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+                #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
                 if self.input_images.isChecked():
                     undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-
-                # Add Selection option for Fish-eye TODO
-                #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                #undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                     
                 frame_inverted = undistorted_frame # cheesey replace
 
@@ -685,9 +679,10 @@ class CameraWidget(QWidget):
             self.countdown_timer.start()
 
     def detectCorners(self, image, columns, rows):
-        # stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed.
-        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        # Stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
+        # In this case the maximum number of iterations is set to 30 and epsilon = 0.1
+        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001) # We want a high accuracy, but does it really help?
 
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -704,9 +699,10 @@ class CameraWidget(QWidget):
             # Now Store Object Points 
             self.object_points.append(self.objp)
 
-            # Refining pixel coordinates for given 2d points.
+            # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
             # cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-            cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            #cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
 
             ## Now Store Corners Detected
             self.image_points.append(corners)
@@ -995,23 +991,18 @@ class CameraWidget(QWidget):
         # Start Calibration again also allow it to save intrinsic / extrinsic output files once -> Not working due to test_started value = True
         if self.input_images.isChecked():
             self.perform_calibration_fisheye()
-        else:
+            self.current_image_index = -1
+            self.load_next_image() 
+
+        if self.input_camera.isChecked():
+            self.timer.start(100) # Start camera feed
             self.perform_calibration()
 
         # Set test boolean to prevent mutiple saves
         #self.test_started = True
 
         # Emit the signal with the updated status text
-        self.update_status_signal.emit("Testing in progess....") 
-
-        # Start update_camera_feed again when using camera feed (TESTING)
-        if self.input_camera.isChecked():      
-            self.timer.start(100) # Start camera feed
-
-        if self.input_images.isChecked():
-            #Load images again (index should be -1 again)
-            self.current_image_index = -1
-            self.load_next_image() # Loads First image in index
+        self.update_status_signal.emit("Testing in progess....")
 
         # First, disconnect all previously connected signals to avoid multiple connections.
         try:
