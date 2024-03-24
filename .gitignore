@@ -162,6 +162,7 @@ cython_debug/
 # Ignored directories
 output/
 dump/
+mrcal/
 #test/
 
 # Ignored files

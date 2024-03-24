@@ -38,7 +38,7 @@ no_of_rows = 7  #number of rows of your Checkerboard
 square_size = 27.0 # size of square on the Checkerboard in mm -> This is no longer required?
 min_cap = 3 # minimum or images to be collected by capturing (Default is 10)
 
-#NEW
+#NEW not used yet
 cam_height = 75 # in cm to center of lens
 
 # Assuming the soccer field is 22 x 14 meters - old
@@ -922,7 +922,6 @@ class CameraWidget (QWidget):
             self.countdown_timer.start()
 
     def detectCorners(self, image, columns, rows):
-        
         # stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
         #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
@@ -950,6 +949,11 @@ class CameraWidget (QWidget):
         
             # Print the number of corners found
             print("Number of corners found:", len(corners))
+
+            # Display the x and y coordinates of each corner _> move to perform_calibration to also get filename
+            #for i, corner in enumerate(corners):
+            #    x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+            #    print(f"Found Corner {i+1}: x = {x}, y = {y}")
 
         return ret, corners, image
 
@@ -993,6 +997,13 @@ class CameraWidget (QWidget):
             # Emit the signal with the updated status text
             self.update_status_signal.emit("Capture Finished")
 
+            # First, disconnect all previously connected signals to avoid multiple connections.
+            try:
+                self.doneButton1.clicked.disconnect()
+            except TypeError:
+                # If no connections exist, a TypeError is raised. Pass in this case.
+                pass
+
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Test Calibration")
             self.doneButton1.clicked.connect(self.test_calibration) # change connect to calibartion test
@@ -1013,21 +1024,31 @@ class CameraWidget (QWidget):
             if file_name.startswith("corner_") and file_name.endswith(".png"):
                 file_path = os.path.join("output", file_name)
                 frame = cv2.imread(file_path)
-                ret_corners, corners, _ = self.detectCorners(frame, no_of_columns, no_of_rows)        
 
-                ###################################################################################################
+                # Detect Corners using OpenCV
+                ret_corners, corners, _ = self.detectCorners(frame, no_of_columns, no_of_rows)
+
                 if ret_corners:
                     #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
-                    #self.image_points.append(corners)
+                    #self.image_points.append(corners) # -> done in detectCorners
+
+                    # Display the x and y coordinates of each corner
+                    for i, corner in enumerate(corners):
+                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+
+                    # TODO Collect the Corners to be saved to corners.vnl
+                    
+                    # TODO Set boolean to calibration finished -> to prefent double / tripple run when moving to dewarp tab2
+
                     print("Calibration Succesfull")
-                ###################################################################################################
 
         # check with min_cap for minimum images needed for calibration (Default should be 10) -> 3 for now
         if len(self.object_points) >= min_cap:
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
-            # Perform camera calibration with FOV <160 degree
+            # Perform camera calibration
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
                 self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
             )
@@ -1047,7 +1068,7 @@ class CameraWidget (QWidget):
                 self.camera_dist_coeff = distortion_coefficients
 
                 # Save intrinsic parameters to intrinsic.txt
-                if self.test_started == False:
+                if self.test_started == True:
                     with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
@@ -1099,7 +1120,17 @@ class CameraWidget (QWidget):
 
                 if ret_corners:
                     #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
-                    #self.image_points.append(corners)
+                    #self.image_points.append(corners) --> Done in detectCorners
+
+                    # Display the x and y coordinates of each corner
+                    for i, corner in enumerate(corners):
+                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+
+                    # TODO Collect the Corners to be saved to corners.vnl
+                        
+                    # TODO Set boolean to calibration finished -> to prefent double / tripple run when moving to dewarp tab2
+
                     print("Calibration Succesfull")
 
         if len(self.object_points) >= min_cap:  # Ensure there's enough data for calibration
@@ -1139,7 +1170,8 @@ class CameraWidget (QWidget):
                 ########################COPY FROM ABOVE################################
 
                 # Save intrinsic parameters to intrinsic.txt
-                if self.test_started == False:
+                #if self.test_started == False:
+                if self.test_started == True: # TODO Not triggered when set to False
                     with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
@@ -1178,17 +1210,13 @@ class CameraWidget (QWidget):
         objp = np.zeros((1, columns * rows, 3), np.float32)
         objp[0, :, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2) * square_size
         return objp
-    
+
     def test_calibration(self):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
 
-        #######################################################################################
-        #        Is this still required or first set test_started = True !!?? TODO
-
-        # Set test boolean to prevent mutiple saves
-        self.test_started = True # Now now intrensic and extrensic parameters saved (but does prevent double saves)
-        #######################################################################################
+        # Set test boolean to prevent mutiple saves (or 10 rows lower?)
+        self.test_started = True
 
         # Start Calibration again also allow it to save intrinsic / extrinsic output files once -> Not working due to test_started value = True
         if self.input_images.isChecked():
@@ -1197,7 +1225,7 @@ class CameraWidget (QWidget):
             self.perform_calibration()
 
         # Set test boolean to prevent mutiple saves
-        # self.test_started = True
+        #self.test_started = True
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....")
@@ -1210,6 +1238,13 @@ class CameraWidget (QWidget):
             #Load images again (index should be -1 again)
             self.current_image_index = -1
             self.load_next_image() # Loads First image in index
+
+        # First, disconnect all previously connected signals to avoid multiple connections.
+        try:
+            self.doneButton1.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
 
         if self.cal_imported == False and self.cal_saved == False: # TRY to prevent double save
             # Update Test Calibration to Save to File
@@ -1288,6 +1323,13 @@ class CameraWidget (QWidget):
             # Self calibration saved to True
             self.cal_saved = True
             
+            # First, disconnect all previously connected signals to avoid multiple connections.
+            try:
+                self.doneButton1.clicked.disconnect()
+            except TypeError:
+                # If no connections exist, a TypeError is raised. Pass in this case.
+                pass
+
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
             self.doneButton1.clicked.connect(self.start_pwarp) # change connect to calibartion test 
@@ -2041,6 +2083,13 @@ class CamCalMain(QMainWindow):
 
                     # Start Camera
                     self.camera_widget.start_capture()
+
+                    # First, disconnect all previously connected signals to avoid multiple connections.
+                    try:
+                        self.doneButton1.clicked.disconnect()
+                    except TypeError:
+                        # If no connections exist, a TypeError is raised. Pass in this case.
+                        pass
 
                     # Update DONE button to Test Calibration
                     self.camera_widget.doneButton1.setText("Test Calibration")
