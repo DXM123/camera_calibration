@@ -1037,14 +1037,14 @@ class CameraWidget(QWidget):
     ############################################################################################
         
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv
-    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients):
+    def undistort_fisheye_frame_prev(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix and distortion_coefficients are available
         if camera_matrix is not None and distortion_coefficients is not None:
 
             # Store Frame Dimension
-            #DIM = frame.shape[:2]
-            _img_shape = frame.shape[:2]
-            DIM = _img_shape[::-1]
+            DIM = frame.shape[:2][::-1]  # Original image dimensions
+            #_img_shape = frame.shape[:2]
+            #DIM = _img_shape[::-1]
             print(f"Frame Dimension (DIM) = {DIM}")
 
             # Undistort and remap frame
@@ -1056,7 +1056,39 @@ class CameraWidget(QWidget):
             print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
         
-    def undistort_fisheye_frame_new(self, frame, camera_matrix, distortion_coefficients, balance=0.1, dim2=None, dim3=None):
+    def undistort_fisheye_frame_simple(self, frame, camera_matrix, distortion_coefficients, balance=0.0):
+        """
+        Undistort a frame captured with a fisheye lens.
+        
+        :param frame: Input frame with distortion.
+        :param camera_matrix: Camera matrix (K).
+        :param distortion_coefficients: Distortion coefficients (D).
+        :param balance: Balance between the viewing area and undistortion effects, where 0 means full correction with possible cropping and 1 means minimal correction with all pixels retained in the output.
+        :return: Undistorted frame.
+        """
+        if camera_matrix is None or distortion_coefficients is None:
+            print("No camera matrix or distortion coefficient detected, showing original frame")
+            return frame
+
+        dim = frame.shape[:2][::-1]  # Original image dimensions
+        print(f"Frame Dimension input (DIM1) = {dim}")
+
+        new_camera_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
+            camera_matrix, distortion_coefficients, dim, np.eye(3), balance=balance
+        )
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(
+            camera_matrix, distortion_coefficients, np.eye(3), new_camera_matrix, dim, cv2.CV_16SC2
+        )
+
+        # Issue: The borderMode=cv2.BORDER_CONSTANT parameter in cv2.remap fills the areas outside the remapping with a constant value (default is black), which, 
+        # if most of the image is out of bounds, results in a black image.
+
+        undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+        return undistorted_frame
+    
+        
+    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0.0, dim2=None, dim3=None):
         """
         Undistort a frame captured with a fisheye lens.
         
@@ -1072,18 +1104,29 @@ class CameraWidget(QWidget):
             print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
         
+        # DIM and dim1 ae always the same so why bother with scaling??
         _img_shape = frame.shape[:2]
-        DIM=_img_shape[::-1]
+        DIM=_img_shape[::-1] # should be original image shape used for calibration
+        print(f"Frame Dimension (DIM) = {DIM}")
 
-        dim1 = frame.shape[:2][::-1]  # Original image dimensions
+        dim1 = frame.shape[:2][::-1]  # Original image dimensions of target images , but not the case here
+        print(f"Frame Dimension input (DIM1) = {dim1}")
+
         if not dim2:
             dim2 = dim1 # Target dimension for the new camera matrix optimization
         if not dim3:
             dim3 = dim1 # Output image dimension for undistortion map
 
-        # Scale K with the dimension of the image to be undistorted
-        scaled_K = camera_matrix * dim1[0] / DIM[0]  
-        scaled_K[2][2] = 1.0  # Ensure that the scaling factor does not affect the principal point
+        # Scale fx and cx with the width ratio, and fy and cy with the height ratio
+        width_ratio = dim1[0] / DIM[0]
+        height_ratio = dim1[1] / DIM[1]
+
+        scaled_K = camera_matrix.copy()
+        scaled_K[0, 0] *= width_ratio  # Scale fx
+        scaled_K[1, 1] *= height_ratio  # Scale fy
+        scaled_K[0, 2] *= width_ratio  # Scale cx
+        scaled_K[1, 2] *= height_ratio  # Scale cy
+        scaled_K[2, 2] = 1.0  # Keep the scale factor for homogeneous coordinates as 1
 
         # Now, estimate the new camera matrix optimized for dim2 dimensions
         new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
