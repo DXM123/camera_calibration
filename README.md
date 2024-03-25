@@ -73,4 +73,5 @@ Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
 
 **Calibration Example:**
 
-![Screenshot from 2024-03-25 21-54-23](https://github.com/DXM123/camera_calibration/assets/19300348/72c173bf-694b-4cd1-b9e4-d82b9c7f736f)
+![Screenshot from 2024-03-25 22-45-28](https://github.com/DXM123/camera_calibration/assets/19300348/8f14485d-b62d-4069-aa66-4f0aefae44b0)
+
