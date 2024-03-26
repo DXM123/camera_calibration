@@ -56,19 +56,10 @@ Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
     python3 -m pip install -r requirements.txt
     ```
 
-4. Run the script. Make sure it is executable:
+4. Run the script.
 
-    ```bash
-    chmod +x Falcons_DeWarp_BETA.py
-    ./Falcons_DeWarp_BETA.py
     ```
-
-5. Or install the package in python
-
-    ```bash
-    cd camera_calibration
-    pip install -e .
-    python -c "from falcons.DeWarp import run; run()"
+    ./calibration-gui.py
     ```
 
 **Calibration Example:**
