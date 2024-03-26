@@ -570,20 +570,24 @@ class CameraWidget(QWidget):
         # Save original image
         org_image = image.copy()
 
-        print(f"test_calibration is set to: {self.test_started}")
+        #print(f"test_calibration is set to: {self.test_started}")
 
         # Add: if not self.test_started: -> update inverted_frame to corrected frame
         if self.test_started == True:
             # Print loaded camera matix
-            self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
-            print("\n Camera matrix used for testing:")
-            print(self.camera_matrix)
+            #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
 
-            # Undistort frame using camera matrix and dist coeff (Add Selection option for Fish-Eye TODO)
-            #undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
-            undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            # Debug print for camera matrix and distortion coefficients
+            #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+            #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-            #image = undistorted_frame # cheesey replace
+            # Not really needed since images now always use fisheye, but prep for fisheye toggle
+            if self.input_images.isChecked():
+                undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            else:
+                undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+
+            #TODO Camera image is flipped when showing
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
             self.cameraFrame.setPixmap(self.pixmap)
@@ -614,7 +618,7 @@ class CameraWidget(QWidget):
         # This method will be called at regular intervals by the timer
         ret, frame = self.cap.read()  # read frame from webcam
 
-        print(f"test_calibration is set to: {self.test_started}")
+        #print(f"test_calibration is set to: {self.test_started}")
 
         if ret:  # if frame captured successfully
             frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
@@ -624,20 +628,16 @@ class CameraWidget(QWidget):
             if self.test_started == True:
 
                 # Print loaded camera matix
-                self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+                #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
 
                 # Debug print for camera matrix and distortion coefficients
-                print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
-                print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
+                #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+                #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
                 if self.input_images.isChecked():
                     undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-
-                # Add Selection option for Fish-eye TODO
-                #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                #undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                     
                 frame_inverted = undistorted_frame # cheesey replace
 
@@ -679,9 +679,10 @@ class CameraWidget(QWidget):
             self.countdown_timer.start()
 
     def detectCorners(self, image, columns, rows):
-        # stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed.
-        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        # Stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
+        # In this case the maximum number of iterations is set to 30 and epsilon = 0.1
+        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001) # We want a high accuracy, but does it really help?
 
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -698,9 +699,10 @@ class CameraWidget(QWidget):
             # Now Store Object Points 
             self.object_points.append(self.objp)
 
-            # Refining pixel coordinates for given 2d points.
+            # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
             # cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-            cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            #cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
 
             ## Now Store Corners Detected
             self.image_points.append(corners)
@@ -710,6 +712,11 @@ class CameraWidget(QWidget):
         
             # Print the number of corners found
             print("Number of corners found:", len(corners))
+
+            # Display the x and y coordinates of each corner _> move to perform_calibration to also get filename
+            #for i, corner in enumerate(corners):
+            #    x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+            #    print(f"Found Corner {i+1}: x = {x}, y = {y}")
 
         return ret, corners, image
 
@@ -758,6 +765,13 @@ class CameraWidget(QWidget):
             # Emit the signal with the updated status text
             self.update_status_signal.emit("Capture Finished")
 
+            # First, disconnect all previously connected signals to avoid multiple connections.
+            try:
+                self.doneButton1.clicked.disconnect()
+            except TypeError:
+                # If no connections exist, a TypeError is raised. Pass in this case.
+                pass
+
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Test Calibration")
             self.doneButton1.clicked.connect(self.test_calibration)  # change connect to calibartion test
@@ -778,14 +792,24 @@ class CameraWidget(QWidget):
             if file_name.startswith("corner_") and file_name.endswith(".png"):
                 file_path = os.path.join("output", file_name)
                 frame = cv2.imread(file_path)
+
+                # Detect Corners using OpenCV
                 ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
 
-                ###################################################################################################
                 if ret_corners:
                     #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
-                    #self.image_points.append(corners)
+                    #self.image_points.append(corners) # -> done in detectCorners
+
+                    # Display the x and y coordinates of each corner
+                    for i, corner in enumerate(corners):
+                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+
+                    # TODO Collect the Corners to be saved to corners.vnl
+                    
+                    # TODO Set boolean to calibration finished -> to prefent double / tripple run when moving to dewarp tab2
+
                     print("Calibration Succesfull")
-                ###################################################################################################
 
         # check with min_cap for minimum images needed for calibration (Default should be 10) (3 for now)
         if len(self.object_points) >= self.min_cap:
@@ -812,7 +836,7 @@ class CameraWidget(QWidget):
                 self.camera_dist_coeff = distortion_coefficients
 
                 # Save intrinsic parameters to intrinsic.txt
-                if self.test_started == False:
+                if self.test_started == True:
                     with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
@@ -866,7 +890,17 @@ class CameraWidget(QWidget):
 
                 if ret_corners:
                     #self.object_points.append(self.generate_object_points(no_of_columns, no_of_rows, square_size))
-                    #self.image_points.append(corners)
+                    #self.image_points.append(corners) --> Done in detectCorners
+
+                    # Display the x and y coordinates of each corner
+                    for i, corner in enumerate(corners):
+                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+
+                    # TODO Collect the Corners to be saved to corners.vnl
+                        
+                    # TODO Set boolean to calibration finished -> to prefent double / tripple run when moving to dewarp tab2
+
                     print("Calibration Succesfull")
 
         if len(self.object_points) >= self.min_cap:  # Ensure there's enough data for calibration
@@ -898,6 +932,7 @@ class CameraWidget(QWidget):
 
                 self.outputWindow.setText(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
                 print(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
+                print(f"The RMS Error is: {rms}")
 
                 self.camera_matrix = K
                 self.camera_dist_coeff = D
@@ -905,7 +940,8 @@ class CameraWidget(QWidget):
                 ########################COPY FROM ABOVE################################
 
                 # Save intrinsic parameters to intrinsic.txt
-                if self.test_started == False:
+                #if self.test_started == False:
+                if self.test_started == True: # TODO Not triggered when set to False
                     with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
@@ -950,33 +986,31 @@ class CameraWidget(QWidget):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
 
-        #######################################################################################
-        #        Is this still required or first set test_started = True !!?? TODO
-
-        # Set test boolean to prevent mutiple saves
-        self.test_started = True # Now now intrensic and extrensic parameters saved (but does prevent double saves)
-        #######################################################################################
+        # Set test boolean to prevent mutiple saves (or 10 rows lower?)
+        self.test_started = True
 
         # Start Calibration again also allow it to save intrinsic / extrinsic output files once -> Not working due to test_started value = True
         if self.input_images.isChecked():
             self.perform_calibration_fisheye()
-        else:
+            self.current_image_index = -1
+            self.load_next_image() 
+
+        if self.input_camera.isChecked():
+            self.timer.start(100) # Start camera feed
             self.perform_calibration()
 
         # Set test boolean to prevent mutiple saves
         #self.test_started = True
 
         # Emit the signal with the updated status text
-        self.update_status_signal.emit("Testing in progess....") 
+        self.update_status_signal.emit("Testing in progess....")
 
-        # Start update_camera_feed again when using camera feed (TESTING)
-        if self.input_camera.isChecked():      
-            self.timer.start(100) # Start camera feed
-
-        if self.input_images.isChecked():
-            #Load images again (index should be -1 again)
-            self.current_image_index = -1
-            self.load_next_image() # Loads First image in index -> not undistort TODO
+        # First, disconnect all previously connected signals to avoid multiple connections.
+        try:
+            self.doneButton1.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
 
         if self.cal_imported == False and self.cal_saved == False: # TRY to prevent double save
             # Update Test Calibration to Save to File
@@ -1003,14 +1037,14 @@ class CameraWidget(QWidget):
     ############################################################################################
         
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv
-    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients):
+    def undistort_fisheye_frame_prev(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix and distortion_coefficients are available
         if camera_matrix is not None and distortion_coefficients is not None:
 
             # Store Frame Dimension
-            #DIM = frame.shape[:2]
-            _img_shape = frame.shape[:2]
-            DIM = _img_shape[::-1]
+            DIM = frame.shape[:2][::-1]  # Original image dimensions
+            #_img_shape = frame.shape[:2]
+            #DIM = _img_shape[::-1]
             print(f"Frame Dimension (DIM) = {DIM}")
 
             # Undistort and remap frame
@@ -1021,6 +1055,89 @@ class CameraWidget(QWidget):
         else:
             print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
+        
+    def undistort_fisheye_frame_simple(self, frame, camera_matrix, distortion_coefficients, balance=0.0):
+        """
+        Undistort a frame captured with a fisheye lens.
+        
+        :param frame: Input frame with distortion.
+        :param camera_matrix: Camera matrix (K).
+        :param distortion_coefficients: Distortion coefficients (D).
+        :param balance: Balance between the viewing area and undistortion effects, where 0 means full correction with possible cropping and 1 means minimal correction with all pixels retained in the output.
+        :return: Undistorted frame.
+        """
+        if camera_matrix is None or distortion_coefficients is None:
+            print("No camera matrix or distortion coefficient detected, showing original frame")
+            return frame
+
+        dim = frame.shape[:2][::-1]  # Original image dimensions
+        print(f"Frame Dimension input (DIM1) = {dim}")
+
+        new_camera_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
+            camera_matrix, distortion_coefficients, dim, np.eye(3), balance=balance
+        )
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(
+            camera_matrix, distortion_coefficients, np.eye(3), new_camera_matrix, dim, cv2.CV_16SC2
+        )
+
+        # Issue: The borderMode=cv2.BORDER_CONSTANT parameter in cv2.remap fills the areas outside the remapping with a constant value (default is black), which, 
+        # if most of the image is out of bounds, results in a black image.
+
+        undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+        return undistorted_frame
+    
+        
+    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0.0, dim2=None, dim3=None):
+        """
+        Undistort a frame captured with a fisheye lens.
+        
+        :param frame: Input frame with distortion.
+        :param camera_matrix: Camera matrix (K).
+        :param distortion_coefficients: Distortion coefficients (D).
+        :param balance: Balance between the viewing area and undistortion effects, where 0 means full correction with possible cropping and 1 means minimal correction with all pixels retained in the output.
+        :param dim2: Desired image size after undistortion (width, height). Default is the size of the input image.
+        :param dim3: Size of the input image (width, height).
+        :return: Undistorted frame.
+        """
+        if camera_matrix is None or distortion_coefficients is None:
+            print("No camera matrix or distortion coefficient detected, showing original frame")
+            return frame
+        
+        # DIM and dim1 ae always the same so why bother with scaling??
+        _img_shape = frame.shape[:2]
+        DIM=_img_shape[::-1] # should be original image shape used for calibration
+        print(f"Frame Dimension (DIM) = {DIM}")
+
+        dim1 = frame.shape[:2][::-1]  # Original image dimensions of target images , but not the case here
+        print(f"Frame Dimension input (DIM1) = {dim1}")
+
+        if not dim2:
+            dim2 = dim1 # Target dimension for the new camera matrix optimization
+        if not dim3:
+            dim3 = dim1 # Output image dimension for undistortion map
+
+        # Scale fx and cx with the width ratio, and fy and cy with the height ratio
+        width_ratio = dim1[0] / DIM[0]
+        height_ratio = dim1[1] / DIM[1]
+
+        scaled_K = camera_matrix.copy()
+        scaled_K[0, 0] *= width_ratio  # Scale fx
+        scaled_K[1, 1] *= height_ratio  # Scale fy
+        scaled_K[0, 2] *= width_ratio  # Scale cx
+        scaled_K[1, 2] *= height_ratio  # Scale cy
+        scaled_K[2, 2] = 1.0  # Keep the scale factor for homogeneous coordinates as 1
+
+        # Now, estimate the new camera matrix optimized for dim2 dimensions
+        new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
+
+        # Initialize the undistort rectify map for the dimensions of the output image (dim3)
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(scaled_K, distortion_coefficients, np.eye(3), new_K, dim3, cv2.CV_16SC2)
+
+        # Finally, remap the image using the undistortion map for the corrected image
+        undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+        return undistorted_frame
         
     #################################################################################################
 
@@ -1055,6 +1172,13 @@ class CameraWidget(QWidget):
 
             # Self calibration saved to True
             self.cal_saved = True
+
+            # First, disconnect all previously connected signals to avoid multiple connections.
+            try:
+                self.doneButton1.clicked.disconnect()
+            except TypeError:
+                # If no connections exist, a TypeError is raised. Pass in this case.
+                pass
 
             # Update DONE button to Test Calibration
             self.doneButton1.setText("Continue to De-Warp")
@@ -1157,10 +1281,6 @@ class CameraWidget(QWidget):
                             undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                         else:
                             undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-
-                        # Apply camera correction if any set (add selection for fish eye TODO)
-                        #undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                        # undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
@@ -1590,7 +1710,13 @@ class CameraWidget(QWidget):
 
                 # Apply camera correction if any set ( Add Selection opion for Fish-Eye TODO)
                 #undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
-                undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                #undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+
+                # Not really needed since images now always use fisheye, but prep for fisheye toggle
+                if self.input_images.isChecked():
+                    undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
 
                 # Perform pwarp at every key press to update frame
                 self.warper_result = self.dewarp(undistorted_frame.copy())  # return warper

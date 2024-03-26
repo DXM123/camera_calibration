@@ -81,6 +81,13 @@ class CamCalMain(QMainWindow):
                     # Start Camera
                     self.camera_widget.start_capture()
 
+                    # First, disconnect all previously connected signals to avoid multiple connections.
+                    try:
+                        self.camera_widget.doneButton1.clicked.disconnect()
+                    except TypeError:
+                        # If no connections exist, a TypeError is raised. Pass in this case.
+                        pass
+
                     # Update DONE button to Test Calibration
                     self.camera_widget.doneButton1.setText("Test Calibration")
                     self.camera_widget.doneButton1.clicked.connect(
