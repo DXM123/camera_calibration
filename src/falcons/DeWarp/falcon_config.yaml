@@ -1,8 +1,12 @@
+# Basic application defaults
+tmp_data: "./tmp_data"
+min_cap: 3  # minimum or images to be collected by capturing (Default is 10)
+countdown_seconds: 3 # Set the initial countdown time to save images with corners detected
+
 # Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns: 7  # number of columns of your Checkerboard
 no_of_rows: 7  # number of rows of your Checkerboard
 square_size: 27.0  # size of square on the Checkerboard in mm -> This is no longer required?
-min_cap: 3  # minimum or images to be collected by capturing (Default is 10)
 cam_height: 75 # in cm to center of lens
 
 # Assuming the soccer field is 22 x 14 meters - old

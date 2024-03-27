@@ -164,6 +164,7 @@ output/
 dump/
 mrcal/
 #test/
+tmp_data/
 
 # Ignored files
 *.log

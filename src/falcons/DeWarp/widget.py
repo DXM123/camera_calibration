@@ -38,15 +38,18 @@ class CameraWidget(QWidget):
     update_status_signal = pyqtSignal(str)
 
     # Set the initial countdown time to save images
-    countdown_seconds = 3  # 3 seconds feels long
+    #countdown_seconds = 3  # 3 seconds feels long
 
     def __init__(self, parent: QMainWindow):
         super(QWidget, self).__init__(parent)
 
         self.config = get_config()
-        self.min_cap = 3 # 10 or more -> also in falcon_config.yaml TODO
+        #self.min_cap = 3 # 10 or more -> also in falcon_config.yaml TODO
+        self.min_cap = self.config.min_cap
+        #self.tmp_data = "./tmp_data"
+        self.countdown_seconds = self.config.countdown_seconds # set to initial value
 
-        # Index for loaded images TODO should not be here
+        # Index for loaded images
         self.image_files = []
         self.current_image_index = -1  # Start with -1, so the first image is at index 0
 
@@ -653,7 +656,7 @@ class CameraWidget(QWidget):
                     print("Capturing in", self.countdown_seconds, "seconds...")
                 elif ret_corners and self.countdown_seconds == 0:
                     self.save_screenshot(original_inverted_frame)  # Have to save original Frame
-                    self.countdown_seconds = 3  # Reset the countdown after saving
+                    self.countdown_seconds = self.config.countdown_seconds  # Reset the countdown after saving
 
                 if ret_corners:
                     # Display the frame with corners
@@ -675,14 +678,14 @@ class CameraWidget(QWidget):
             self.countdown_timer.stop()
 
             # Reset the countdown to its initial value
-            self.countdown_seconds = 3
+            self.countdown_seconds = self.config.countdown_seconds
             self.countdown_timer.start()
 
     def detectCorners(self, image, columns, rows):
         # Stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
         # In this case the maximum number of iterations is set to 30 and epsilon = 0.1
-        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001) # We want a high accuracy, but does it really help?
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001) # We want a high accuracy, but does it really help?
 
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -701,8 +704,8 @@ class CameraWidget(QWidget):
 
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
             # cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-            #cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
-            cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
+            cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            #cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
 
             ## Now Store Corners Detected
             self.image_points.append(corners)
@@ -722,15 +725,17 @@ class CameraWidget(QWidget):
 
     def save_screenshot(self, frame):
         # Ensure that the output directory exists
-        output_dir = "./output"
+        #tmp_dir = "./tmp_data"
+        tmp_dir = self.config.tmp_data
 
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        if not os.path.exists(tmp_dir):
+            os.makedirs(tmp_dir)
 
         # Generate a timestamp for the screenshot filename
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
 
-        filename = f"output/corner_{timestamp}.png"
+        # tmp_data should be set centrally TODO
+        filename = f"{tmp_dir}/corner_{timestamp}.png"
 
         # Save the frame as an image
         cv2.imwrite(filename, frame)
@@ -746,12 +751,12 @@ class CameraWidget(QWidget):
 
     # Check collected images with corners and start calibration if ok
     def check_done(self):
-        if self.ImagesCounter < self.min_cap:
-            rem = self.min_cap - self.ImagesCounter
+        if self.ImagesCounter < self.config.min_cap:
+            rem = self.config.min_cap - self.ImagesCounter
             QMessageBox.question(
                 self,
                 "Warning!",
-                f"The minimum number of captured images is set to {self.min_cap}.\n\nPlease collect {rem} more images",
+                f"The minimum number of captured images is set to {self.config.min_cap}.\n\nPlease collect {rem} more images",
                 QMessageBox.Ok,
             )
         else:
@@ -786,11 +791,14 @@ class CameraWidget(QWidget):
         self.object_points = []  # 3D points in real world space
         self.image_points = []   # 2D points in image plane
 
-        image_files = sorted(os.listdir("output"))  # Now using output folder instead of input folder
+        # tmp_data should be set centrally
+        #image_files = sorted(os.listdir("tmp_data"))  # Now using tmp data folder instead of input folder
+        image_files = sorted(os.listdir(self.config.tmp_data))  # Now using tmp data folder instead of input folder
 
         for file_name in image_files:
             if file_name.startswith("corner_") and file_name.endswith(".png"):
-                file_path = os.path.join("output", file_name)
+                #file_path = os.path.join("tmp_data", file_name)
+                file_path = os.path.join(self.config.tmp_data, file_name)
                 frame = cv2.imread(file_path)
 
                 # Detect Corners using OpenCV
@@ -812,7 +820,8 @@ class CameraWidget(QWidget):
                     print("Calibration Succesfull")
 
         # check with min_cap for minimum images needed for calibration (Default should be 10) (3 for now)
-        if len(self.object_points) >= self.min_cap:
+        if len(self.object_points) >= self.config.min_cap:
+            print(f"Found {self.object_points} images with corners detected")
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -837,7 +846,8 @@ class CameraWidget(QWidget):
 
                 # Save intrinsic parameters to intrinsic.txt
                 if self.test_started == True:
-                    with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                    #with open(f"./tmp_data/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"./{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
                         file.write("\n\nDistortion Coefficients:\n")
@@ -852,19 +862,19 @@ class CameraWidget(QWidget):
                     print(tvecs)
 
                     # Save extrinsic parameters to extrinsic.txt
-                    with open(f"./output/extrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                    with open(f"./{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
                         for i in range(len(rvecs)):
                             file.write(f"\n\nImage {i+1}:\n")
                             file.write(f"Rotation Vector:\n{rvecs[i]}\n")
                             file.write(f"Translation Vector:\n{tvecs[i]}")
                     
-                    self.outputWindow.setText(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
-                    print(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
+                    self.outputWindow.setText(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
+                    print(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
 
             else:
                 print("Camera Calibration failed")
         else:
-            print(f"Need {self.min_cap} images with corners, only {len(self.object_points)} found")
+            print(f"Need {self.config.min_cap} images with corners, only {len(self.object_points)} found")
         
 
     
@@ -880,11 +890,13 @@ class CameraWidget(QWidget):
         self.object_points = []  # 3D points in real world space
         self.image_points = []   # 2D points in image plane
 
-        image_files = sorted(os.listdir("output"))  # Now using output folder instead of input folder
+        # tmp_data should be set centrally
+        image_files = sorted(os.listdir("tmp_data"))  # Now using tmp folder instead of input folder
         
         for file_name in image_files:
             if file_name.startswith("corner_") and file_name.endswith(".png"):
-                file_path = os.path.join("output", file_name)
+                #file_path = os.path.join("tmp_data", file_name)
+                file_path = os.path.join(self.config.tmp_data, file_name)
                 frame = cv2.imread(file_path)
                 ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
 
@@ -903,7 +915,7 @@ class CameraWidget(QWidget):
 
                     print("Calibration Succesfull")
 
-        if len(self.object_points) >= self.min_cap:  # Ensure there's enough data for calibration
+        if len(self.object_points) >= self.config.min_cap:  # Ensure there's enough data for calibration
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             obj_points = np.array(self.object_points)
             img_points = np.array(self.image_points)
@@ -942,7 +954,8 @@ class CameraWidget(QWidget):
                 # Save intrinsic parameters to intrinsic.txt
                 #if self.test_started == False:
                 if self.test_started == True: # TODO Not triggered when set to False
-                    with open(f"./output/intrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                    #with open(f"./tmp_data/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
                         file.write("\n\nDistortion Coefficients:\n")
@@ -957,14 +970,15 @@ class CameraWidget(QWidget):
                     print(tvecs)
 
                     # Save extrinsic parameters to extrinsic.txt
-                    with open(f"./output/extrinsic_{timestamp}.txt", "w") as file: # TODO update output folder with variable
+                    #with open(f"./tmp_data/extrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
                         for i in range(len(rvecs)):
                             file.write(f"\n\nImage {i+1}:\n")
                             file.write(f"Rotation Vector:\n{rvecs[i]}\n")
                             file.write(f"Translation Vector:\n{tvecs[i]}")
                     
-                    self.outputWindow.setText(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
-                    print(f"Calibration parameters saved to ./output/intrinsic_{timestamp}.txt and ./output/extrinsic_{timestamp}.txt.")
+                    self.outputWindow.setText(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
+                    print(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
 
                     ###########################
 
@@ -972,7 +986,7 @@ class CameraWidget(QWidget):
                 print(f"Calibration failed with error: {e}")
 
         else:
-            print(f"Need at least {self.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
+            print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
 
     ######################################################################
 
@@ -989,7 +1003,7 @@ class CameraWidget(QWidget):
         # Set test boolean to prevent mutiple saves (or 10 rows lower?)
         self.test_started = True
 
-        # Start Calibration again also allow it to save intrinsic / extrinsic output files once -> Not working due to test_started value = True
+        # Start Calibration again also allow it to save intrinsic / extrinsic tmp files once -> Not working due to test_started value = True
         if self.input_images.isChecked():
             self.perform_calibration_fisheye()
             self.current_image_index = -1
@@ -1164,7 +1178,8 @@ class CameraWidget(QWidget):
 
         try:
             # Write the calibration parameters to the JSON file
-            with open(f"./output/{fname}", "w") as file:  # TODO update output folder with variable
+            #with open(f"./tmp_data/{fname}", "w") as file:  # TODO update tmp folder with variable
+            with open(f"{self.config.tmp_data}/{fname}", "w") as file:
                 json.dump(data, file)
 
             # Emit the signal with the updated status text

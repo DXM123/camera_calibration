@@ -7,11 +7,15 @@ import yaml
 
 @dataclasses.dataclass
 class DeWarpConfig:
+    # Basic application defaults
+    tmp_data: str # temporary process data folder
+    min_cap: int  # minimum or images to be collected by capturing (Default is 10)
+    countdown_seconds: int # Set the initial countdown time to save images with corners detected
+
     # Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
     no_of_columns: int  # number of columns of your Checkerboard
     no_of_rows: int  # number of rows of your Checkerboard
     square_size: float  # size of square on the Checkerboard in mm -> TODO: This is no longer required?
-    min_cap: int  # minimum or images to be collected by capturing (Default is 10)
     cam_height: int # in cm to center of lens
 
     # Assuming the soccer field is 22 x 14 meters - old
@@ -99,5 +103,5 @@ def get_config(path_to_config: Optional[str] = None) -> DeWarpConfig:
         path_to_config = os.path.join(os.path.dirname(__file__), "falcon_config.yaml")
     with open(path_to_config, "r") as f:
         config = yaml.safe_load(f)
-
+    #print(config)  # See exactly what's being loaded from the YAML
     return DeWarpConfig(**config)

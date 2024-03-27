@@ -39,7 +39,7 @@ def parse_args(args: list) -> argparse.Namespace:
     #parser.add_argument('-G', '--nogui', help='do not start the GUI, intended for regression tests', action='store_true') # maybe too much work
     return parser.parse_args(args)
 
-
+# Output folder to store json, bin and captures
 def default_data_folder():
     return f'/home/{USERNAME}/falcons/vision_calibration'
     # note: example structure of the suggested calibration data repo

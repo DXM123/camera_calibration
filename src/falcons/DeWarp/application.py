@@ -1,9 +1,11 @@
 import json
 import os
+import sys
 
 from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow, QMessageBox, QStatusBar
 
 from .widget import CameraWidget
+from .config import get_config
 
 
 class CamCalMain(QMainWindow):
@@ -13,7 +15,8 @@ class CamCalMain(QMainWindow):
         self.setWindowTitle(self.title)
         self.setGeometry(0, 0, 800, 600)  # #self.setGeometry(self.left, self.top, self.width, self.height)
 
-        self.output_folder = "./output"
+        self.config = get_config()  # load config 
+        self.check_tmp_data_empty()  # check if tmp data folder is empty
 
         self.init_ui()  # initialize UI
 
@@ -43,12 +46,52 @@ class CamCalMain(QMainWindow):
         # Connect the signal to the slot for updating the status bar
         self.camera_widget.update_status_signal.connect(self.update_status_bar)
 
+    
+    def check_tmp_data_empty(self):
+        # Check if the temporary data folder exists for temporarily processing captured images
+        if not os.path.exists(self.config.tmp_data):
+            try:
+                os.makedirs(self.config.tmp_data, exist_ok=True)
+                QMessageBox.information(self, "Info", "The temporary data folder was created successfully.", QMessageBox.Ok)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to create the temporary data folder: {e}", QMessageBox.Ok)
+                sys.exit(1)  # Exits the application with an error status.
+        else:
+            # Check if there are existing images in the temp folder
+            existing_images = [f for f in os.listdir(self.config.tmp_data) if f.startswith("corner_") and f.endswith(".png")]
+
+            if existing_images:
+                # Ask the user if they want to delete existing images
+                reply = QMessageBox.question(
+                    self,
+                    "Existing Images",
+                    "There are existing images in the temporary data folder. Do you want to delete them?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+
+                if reply == QMessageBox.Yes:
+                    # Delete existing images
+                    for image_file in existing_images:
+                        file_path = os.path.join(self.config.tmp_data, image_file)
+                        os.remove(file_path)
+
+                    # Inform the user about the deletion
+                    QMessageBox.information(self, "Deletion Complete", "Existing images have been deleted.", QMessageBox.Ok)
+
+                else:
+                    # If the user chooses not to delete, inform them and exit the method
+                    QMessageBox.information(self, "Calibration Canceled", "Calibration process canceled.", QMessageBox.Ok)
+
+                    #return
+                    sys.exit(0)
+
 
     def load_calibration(self, filename):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
 
-        # TODO open ouput folder to load JSON
+        # TODO open ouput folder to load JSON (take from args)
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Open Calibration File", "", "JSON Files (*.json);;All Files (*)", options=options
         )
