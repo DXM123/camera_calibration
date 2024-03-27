@@ -37,16 +37,11 @@ class CameraWidget(QWidget):
     # Add a signal for updating the status
     update_status_signal = pyqtSignal(str)
 
-    # Set the initial countdown time to save images
-    #countdown_seconds = 3  # 3 seconds feels long
-
     def __init__(self, parent: QMainWindow):
         super(QWidget, self).__init__(parent)
 
         self.config = get_config()
-        #self.min_cap = 3 # 10 or more -> also in falcon_config.yaml TODO
         self.min_cap = self.config.min_cap
-        #self.tmp_data = "./tmp_data"
         self.countdown_seconds = self.config.countdown_seconds # set to initial value
 
         # Index for loaded images
@@ -725,7 +720,6 @@ class CameraWidget(QWidget):
 
     def save_screenshot(self, frame):
         # Ensure that the output directory exists
-        #tmp_dir = "./tmp_data"
         tmp_dir = self.config.tmp_data
 
         if not os.path.exists(tmp_dir):
@@ -734,7 +728,6 @@ class CameraWidget(QWidget):
         # Generate a timestamp for the screenshot filename
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
 
-        # tmp_data should be set centrally TODO
         filename = f"{tmp_dir}/corner_{timestamp}.png"
 
         # Save the frame as an image
@@ -791,13 +784,11 @@ class CameraWidget(QWidget):
         self.object_points = []  # 3D points in real world space
         self.image_points = []   # 2D points in image plane
 
-        # tmp_data should be set centrally
-        #image_files = sorted(os.listdir("tmp_data"))  # Now using tmp data folder instead of input folder
-        image_files = sorted(os.listdir(self.config.tmp_data))  # Now using tmp data folder instead of input folder
+        # Now using tmp data folder instead of input folder
+        image_files = sorted(os.listdir(self.config.tmp_data))
 
         for file_name in image_files:
             if file_name.startswith("corner_") and file_name.endswith(".png"):
-                #file_path = os.path.join("tmp_data", file_name)
                 file_path = os.path.join(self.config.tmp_data, file_name)
                 frame = cv2.imread(file_path)
 
@@ -846,8 +837,7 @@ class CameraWidget(QWidget):
 
                 # Save intrinsic parameters to intrinsic.txt
                 if self.test_started == True:
-                    #with open(f"./tmp_data/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
-                    with open(f"./{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"./{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file:
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
                         file.write("\n\nDistortion Coefficients:\n")
@@ -862,7 +852,7 @@ class CameraWidget(QWidget):
                     print(tvecs)
 
                     # Save extrinsic parameters to extrinsic.txt
-                    with open(f"./{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"./{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file:
                         for i in range(len(rvecs)):
                             file.write(f"\n\nImage {i+1}:\n")
                             file.write(f"Rotation Vector:\n{rvecs[i]}\n")
@@ -890,12 +880,11 @@ class CameraWidget(QWidget):
         self.object_points = []  # 3D points in real world space
         self.image_points = []   # 2D points in image plane
 
-        # tmp_data should be set centrally
-        image_files = sorted(os.listdir("tmp_data"))  # Now using tmp folder instead of input folder
+        # Now using tmp folder instead of input folder
+        image_files = sorted(os.listdir(self.config.tmp_data))
         
         for file_name in image_files:
             if file_name.startswith("corner_") and file_name.endswith(".png"):
-                #file_path = os.path.join("tmp_data", file_name)
                 file_path = os.path.join(self.config.tmp_data, file_name)
                 frame = cv2.imread(file_path)
                 ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
@@ -954,8 +943,7 @@ class CameraWidget(QWidget):
                 # Save intrinsic parameters to intrinsic.txt
                 #if self.test_started == False:
                 if self.test_started == True: # TODO Not triggered when set to False
-                    #with open(f"./tmp_data/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
-                    with open(f"{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file:
                         file.write("Camera Matrix:\n")
                         file.write(str(self.camera_matrix))
                         file.write("\n\nDistortion Coefficients:\n")
@@ -970,8 +958,7 @@ class CameraWidget(QWidget):
                     print(tvecs)
 
                     # Save extrinsic parameters to extrinsic.txt
-                    #with open(f"./tmp_data/extrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
-                    with open(f"{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file: # TODO update tmp folder with variable
+                    with open(f"{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file:
                         for i in range(len(rvecs)):
                             file.write(f"\n\nImage {i+1}:\n")
                             file.write(f"Rotation Vector:\n{rvecs[i]}\n")
@@ -1178,7 +1165,6 @@ class CameraWidget(QWidget):
 
         try:
             # Write the calibration parameters to the JSON file
-            #with open(f"./tmp_data/{fname}", "w") as file:  # TODO update tmp folder with variable
             with open(f"{self.config.tmp_data}/{fname}", "w") as file:
                 json.dump(data, file)
 

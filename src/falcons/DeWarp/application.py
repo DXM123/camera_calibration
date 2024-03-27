@@ -83,7 +83,6 @@ class CamCalMain(QMainWindow):
                     # If the user chooses not to delete, inform them and exit the method
                     QMessageBox.information(self, "Calibration Canceled", "Calibration process canceled.", QMessageBox.Ok)
 
-                    #return
                     sys.exit(0)
 
 
@@ -91,7 +90,7 @@ class CamCalMain(QMainWindow):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
 
-        # TODO open ouput folder to load JSON (take from args)
+        # TODO open folder to load JSON (take from args)
         file_name, _ = QFileDialog.getOpenFileName(
             self, "Open Calibration File", "", "JSON Files (*.json);;All Files (*)", options=options
         )
