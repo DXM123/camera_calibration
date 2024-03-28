@@ -11,12 +11,15 @@ from .config import get_config
 class CamCalMain(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.title = "Falcons De-Warp Tool - BETA"
+        self.title = "Falcons Calibration GUI - BETA"
         self.setWindowTitle(self.title)
         self.setGeometry(0, 0, 800, 600)  # #self.setGeometry(self.left, self.top, self.width, self.height)
 
         self.config = get_config()  # load config 
         self.check_tmp_data_empty()  # check if tmp data folder is empty
+
+        # Initialize camera_matrix as None
+        #self.camera_matrix = None
 
         self.init_ui()  # initialize UI
 
@@ -83,7 +86,7 @@ class CamCalMain(QMainWindow):
                     # If the user chooses not to delete, inform them and exit the method
                     QMessageBox.information(self, "Calibration Canceled", "Calibration process canceled.", QMessageBox.Ok)
 
-                    sys.exit(0)
+                    sys.exit(0) # Exits the application without an error status, this is by choice.
 
 
     def load_calibration(self, filename):
@@ -99,8 +102,12 @@ class CamCalMain(QMainWindow):
             try:
                 with open(file_name, "r") as f:
                     data = json.load(f)
-                    self.camera_matrix = data.get("camera_matrix")
-                    self.camera_dist_coeff = data.get("dist_coeff")
+                    #self.camera_matrix = data.get("camera_matrix")
+                    #self.camera_dist_coeff = data.get("dist_coeff")
+
+                    # Load into camera widget variable
+                    self.camera_widget.camera_matrix = data.get("camera_matrix")
+                    self.camera_widget.camera_dist_coeff = data.get("dist_coeff")
 
                     # Emit the signal with the updated status text
                     self.camera_widget.update_status_signal.emit(f"Calibration parameters loaded from {file_name}")
@@ -114,14 +121,9 @@ class CamCalMain(QMainWindow):
                     # Disable Capture Button when import succeeded
                     self.camera_widget.captureButton1.setDisabled(True)
 
-                    # Cheesy set ImageCOunter to minimum to start testing
-                    # TODO What is `self.ImagesCounter` needed for?
-                    # TODO Fix hard coded value below / match default of `camera_widget`?
-                    self.ImagesCounter = self.camera_widget.min_cap
-                    self.camera_widget.ImagesCounter = self.camera_widget.min_cap
-
-                    # Start Camera
-                    self.camera_widget.start_capture()
+                    # Start Camera when selected
+                    if self.camera_widget.input_camera.isChecked():
+                        self.camera_widget.start_capture()
 
                     # First, disconnect all previously connected signals to avoid multiple connections.
                     try:

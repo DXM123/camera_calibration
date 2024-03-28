@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QApplication
 
 from .application import CamCalMain
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 def run(args):
     app = QApplication([])

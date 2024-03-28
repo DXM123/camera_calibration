@@ -476,6 +476,7 @@ class CameraWidget(QWidget):
 
             # GOTO NEXT -> Press DONE
 
+    # Image loading for tab1
     def load_image_local(self, file_name):
         if file_name:
             # Image loading and processing logic here
@@ -506,6 +507,42 @@ class CameraWidget(QWidget):
             if self.cameraFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
                 
+                self.update_image_feed(self.cv_image) 
+
+            else:
+                self.processoutputWindow.setText("Problem displaying image")
+
+    # Image loading for tab2
+    def load_image_forWarp(self, file_name):
+        if file_name:
+            # Image loading and processing logic here
+            self.cv_image = cv2.imread(file_name)
+            self.cv_image_rgb = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2RGB)  # Corrected color conversion
+
+            # Covert to Pixmap and other operations...
+            pixmap = self.imageToPixmap(self.cv_image_rgb)
+
+            # Set loaded image in CameraFrame
+            self.imageFrame.setPixmap(pixmap)
+            self.imageFrame.setScaledContents(False) # Never Scale
+
+            # Adjust cameraFrame size to match the pixmap size - Set Fixed Size like imageFrame
+            self.imageFrame.setFixedSize(pixmap.size())
+
+            # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
+            # Get the width of cameraFrame
+            imageFrameWidth = self.imageFrame.size().width()
+
+            # Print the cameraFrame width
+            print(f"cameraFrame Width: {imageFrameWidth}")
+
+            # Set the buttons to the same width as cameraFrame
+            self.doneButton1.setFixedWidth(imageFrameWidth)
+            self.captureButton1.setFixedWidth(imageFrameWidth)
+
+            if self.imageFrame.pixmap() is not None:
+                self.processoutputWindow.setText("Image loaded")
+                    
                 self.update_image_feed(self.cv_image) 
 
             else:
@@ -570,27 +607,39 @@ class CameraWidget(QWidget):
 
         #print(f"test_calibration is set to: {self.test_started}")
 
-        # Add: if not self.test_started: -> update inverted_frame to corrected frame
-        if self.test_started == True:
+        if self.test_started or self.cal_imported:
             # Print loaded camera matix
             #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+
+            #TODO Check self.camera.matrix and self.dist_coeff are available?
+            print("Calibartion test started or calibration imported")
 
             # Debug print for camera matrix and distortion coefficients
             #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
             #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-            # Not really needed since images now always use fisheye, but prep for fisheye toggle
+            # prep for fisheye toggle
             if self.input_images.isChecked():
                 undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
             else:
                 undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
-            #TODO Camera image is flipped when showing
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
-            self.cameraFrame.setPixmap(self.pixmap)
+            
+            # TODO Use cameraFrame for tab1 and imageFrame for tab2
+            #if self.tab1.isActiveWindow():
+            #    self.cameraFrame.setPixmap(self.pixmap)
+            #else:
+            #    self.imageFrame.setPixmap(self.pixmap)
+
+            if self.tabs.currentIndex() == 0:  # tab1 is at index 0
+                self.cameraFrame.setPixmap(self.pixmap)
+            elif self.tabs.currentIndex() == 1:  # tab2 is at index 1
+                self.imageFrame.setPixmap(self.pixmap)
 
         else:
+            print("No test started or calibration file loaded")
             #org_image = self.imageToPixmap(image)
             ret_corners, corners, frame_with_corners = self.detectCorners(image, self.no_of_columns, self.no_of_rows)
 
@@ -608,7 +657,7 @@ class CameraWidget(QWidget):
                 self.pixmap = self.imageToPixmap(org_image)
                 self.cameraFrame.setPixmap(self.pixmap)
 
-            # Ensure the image does not scales with the label -> issue with aspect ratio TODO
+        # Ensure the image does not scales with the label -> issue with aspect ratio TODO
         self.cameraFrame.setScaledContents(False)
         self.update()
 
@@ -619,14 +668,16 @@ class CameraWidget(QWidget):
         #print(f"test_calibration is set to: {self.test_started}")
 
         if ret:  # if frame captured successfully
-            frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
+            frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally --> Is this needed TODO
             original_inverted_frame = frame_inverted.copy()  # Store the original frame
 
-            # Add: if not self.test_started: -> update inverted_frame to corrected frame
-            if self.test_started == True:
+            # TODO update inverted_frame to corrected frame
+            if self.test_started or self.cal_imported:
 
                 # Print loaded camera matix
                 #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
+
+                #TODO Check self.camera.matrix and self.dist_coeff are available?
 
                 # Debug print for camera matrix and distortion coefficients
                 #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
@@ -1044,9 +1095,7 @@ class CameraWidget(QWidget):
 
             # Store Frame Dimension
             DIM = frame.shape[:2][::-1]  # Original image dimensions
-            #_img_shape = frame.shape[:2]
-            #DIM = _img_shape[::-1]
-            print(f"Frame Dimension (DIM) = {DIM}")
+            #print(f"Frame Dimension (DIM) = {DIM}")
 
             # Undistort and remap frame
             map1, map2 = cv2.fisheye.initUndistortRectifyMap(camera_matrix, distortion_coefficients, np.eye(3), camera_matrix, DIM, cv2.CV_16SC2)
@@ -1072,7 +1121,7 @@ class CameraWidget(QWidget):
             return frame
 
         dim = frame.shape[:2][::-1]  # Original image dimensions
-        print(f"Frame Dimension input (DIM1) = {dim}")
+        #print(f"Frame Dimension input (DIM1) = {dim}")
 
         new_camera_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
             camera_matrix, distortion_coefficients, dim, np.eye(3), balance=balance
@@ -1108,10 +1157,10 @@ class CameraWidget(QWidget):
         # DIM and dim1 ae always the same so why bother with scaling??
         _img_shape = frame.shape[:2]
         DIM=_img_shape[::-1] # should be original image shape used for calibration
-        print(f"Frame Dimension (DIM) = {DIM}")
+        #print(f"Frame Dimension (DIM) = {DIM}")
 
         dim1 = frame.shape[:2][::-1]  # Original image dimensions of target images , but not the case here
-        print(f"Frame Dimension input (DIM1) = {dim1}")
+        #print(f"Frame Dimension input (DIM1) = {dim1}")
 
         if not dim2:
             dim2 = dim1 # Target dimension for the new camera matrix optimization
@@ -1161,15 +1210,16 @@ class CameraWidget(QWidget):
         data = {"camera_matrix": camera_matrix_list, "dist_coeff": dist_coeff_list}
         fname = f"data_{timestamp}.json"
 
-        # print(f"Dumping below to file {fname}: \n\n {data}")
-
         try:
+            print(f"Saving to file {fname}: \n\n {data}")
+
             # Write the calibration parameters to the JSON file
             with open(f"{self.config.tmp_data}/{fname}", "w") as file:
                 json.dump(data, file)
 
             # Emit the signal with the updated status text
-            self.update_status_signal.emit("Calibration file Saved")
+            self.update_status_signal.emit(f"Calibration file {fname} Saved")
+            print(f"Calibartion file {fname} saved")
 
             # Self calibration saved to True
             self.cal_saved = True
@@ -1217,30 +1267,42 @@ class CameraWidget(QWidget):
             # Set image Dewarp to True
             self.image_dewarp = True  # TODO Does not below here
 
+            print("Image Loaded ....")
+            print(f"Calibration imported is: {self.cal_imported}")
+
+            #####################################################################################
+            # Add up update_image_feed
+            # TODO: Space still working for looping through images only 1 image should be used?
+            # Clear the variable containing the list of images?
+
+            self.load_image_forWarp(file_name)
+
+            #####################################################################################
+
             # Load the image using OpenCv
-            self.cv_image = cv2.imread(file_name)
-            self.cv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_RGB2BGR)
+            #self.cv_image = cv2.imread(file_name)
+            #self.cv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_RGB2BGR)
 
             # Covert to Pixmap
-            pixmap = self.imageToPixmap(self.cv_image)  ## Test
+            #pixmap = self.imageToPixmap(self.cv_image)  ## Test
 
             # Show stuff
-            self.imageFrame.setPixmap(pixmap)
-            self.imageFrame.setScaledContents(False)  # Set to false to prevent issues with aspect ratio
+            #self.imageFrame.setPixmap(pixmap)
+            #self.imageFrame.setScaledContents(False)  # Set to false to prevent issues with aspect ratio
 
             # Adjust imageFrame size to exactly match the pixmap size needed for proper mouse x,y
-            self.imageFrame.setFixedSize(pixmap.size())
+            #self.imageFrame.setFixedSize(pixmap.size())
 
             # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
             # Get the width of cameraFrame
-            imageFrameWidth = self.imageFrame.size().width()
+            #imageFrameWidth = self.imageFrame.size().width()
 
             # Print the cameraFrame width
-            print(f"imageFrame Width: {imageFrameWidth}")
+            #print(f"imageFrame Width: {imageFrameWidth}")
 
             # Set the buttons to the same width as cameraFrame
-            self.startButtonPwarp.setFixedWidth(imageFrameWidth)
-            self.loadImage.setFixedWidth(imageFrameWidth)
+            #self.startButtonPwarp.setFixedWidth(imageFrameWidth)
+            #self.loadImage.setFixedWidth(imageFrameWidth)
 
             # TODO check pixmap set is not none
             if self.imageFrame.pixmap() is not None:

@@ -73,3 +73,14 @@ class Warper(object):
             else:
                 out[:] = cv2.resize(self.dst, (self.width, self.height), interpolation=self.interpolation)
                 return out
+
+    # Not working properly yet
+    def warp_simple(self, img):
+        # Always compute the warped perspective.
+        dst = cv2.warpPerspective(img, self.M, (int(self.width * self.supersample), int(self.height * self.supersample)), interpolation=self.interpolation)
+        
+        # Resize if supersampling is applied.
+        if self.supersample != 1:
+            dst = cv2.resize(dst, (int(self.width), int(self.height)), interpolation=self.interpolation)
+        
+        return dst
