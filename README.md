@@ -64,5 +64,4 @@ Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
 
 **Calibration Example:**
 
-![Screenshot from 2024-03-25 22-45-28](https://github.com/DXM123/camera_calibration/assets/19300348/8f14485d-b62d-4069-aa66-4f0aefae44b0)
-
+![Screenshot from 2024-03-28 18-38-15](https://github.com/DXM123/camera_calibration/assets/19300348/fb1c6291-1d3e-46d0-8285-420dfcf833d0)
