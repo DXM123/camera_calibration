@@ -4,7 +4,6 @@ import logging
 import cv2
 import numpy as np
 
-
 class Warper(object):
     def __init__(
         self,
@@ -31,12 +30,7 @@ class Warper(object):
         self.height = height
 
         self.points = points
-        # self.points = np.array([points[0], points[1], points[3], points[2]])
-        # Update self.landmark_points with the FCS landmarks 2,0 6,0 0,2 0,6
-        # self.landmark_points = np.array([FCS02, FCS06, FCS60, FCS20]) # mirror
-        # Need to be global? Now have to add same to CameraWidget Class TODO
         self.landmark_points = landmark_points
-        # self.landmark_points = np.array([FCS20, FCS60, FCS06, FCS02])  # Odd order ofcourse but looks ok TODO
 
         logging.info(
             "Following values used as input for Warper Class:"
@@ -81,6 +75,7 @@ class Warper(object):
         
         # Resize if supersampling is applied.
         if self.supersample != 1:
+            self.interpolation = cv2.INTER_CUBIC
             dst = cv2.resize(dst, (int(self.width), int(self.height)), interpolation=self.interpolation)
         
         return dst
