@@ -1,7 +1,7 @@
 # Install mrcal & mrgingham
 apt install mrcal libmrcal-dev python3-mrcal mrgingham libmrgingham-dev
 
-# nrcal only supports 10x10 grid, mrgingham also less
+# mrcal only supports 10x10 grid, mrgingham also less
 
 #Generate corners.vnl
 mrgingham --jobs 4 --gridn 7 './test/test_calibration/R13/cam0/*.jpg' > ./test/R13-cam0-corners.vnl
