@@ -1,0 +1,36 @@
+# Install mrcal & mrgingham
+apt install mrcal libmrcal-dev python3-mrcal mrgingham libmrgingham-dev
+
+# nrcal only supports 10x10 grid, mrgingham also less
+
+#Generate corners.vnl
+mrgingham --jobs 4 --gridn 7 './test/test_calibration/R13/cam0/*.jpg' > ./test/R13-cam0-corners.vnl
+
+#Create OPENCV8 Camera Model
+mrcal-calibrate-cameras         \
+  --corners-cache ./test/R13-cam0-corners.vnl   \
+  --lensmodel LENSMODEL_OPENCV8 \
+  --focal 800                   \
+  --object-spacing 0.027        \
+  --object-width-n 7            \
+  './test/test_calibration/R13/cam0/*.jpg'
+  
+#Rename and movecameramodel
+mv camera-0.cameramodel ./test/R13-cam0-opencv8.cameramodel
+
+#Create Splinned Camera Model (Better accuracy, lower RMS) FOV ~ 140 degree
+
+mrcal-calibrate-cameras         \
+  --corners-cache ./test/R13-cam0-corners.vnl   \
+  --lensmodel LENSMODEL_SPLINED_STEREOGRAPHIC_order=3_Nx=30_Ny=18_fov_x_deg=140 \
+  --focal 800                   \
+  --object-spacing 0.027        \
+  --object-width-n 7            \
+  './test/test_calibration/R13/cam0/*.jpg'
+  
+#Rename and move cameramodel
+mv camera-0.cameramodel ./test/R13-cam0-splined.cameramodel
+
+#Debug commands
+
+
