@@ -163,7 +163,7 @@ cython_debug/
 output/
 dump/
 mrcal/
-#test/
+test/prev_tool_gui/
 tmp_data/
 video/
 
