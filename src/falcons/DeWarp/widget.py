@@ -113,8 +113,9 @@ class CameraWidget(QWidget):
             [
                 self.config.field_coordinates_lm1,
                 self.config.field_coordinates_lm2,
-                self.config.field_coordinates_lm4,
+                #self.config.field_coordinates_lm4,
                 self.config.field_coordinates_lm3,
+                self.config.field_coordinates_lm4,
             ]
         )
         # np.float32([FCS20, FCS60, FCS06, FCS02])  # Odd order ofcourse but looks ok TODO
@@ -1269,16 +1270,19 @@ class CameraWidget(QWidget):
                 print("Image Perspective Warp started")
                 self.update_status_signal.emit("Image Perspective Warp started")
 
-                # Use frame from load_image? 
+                # Get frame --> TODO check all placed where self.cv_image is stored
                 frame = self.cv_image
-                #frame = self.imageFrame.pixmap()
 
                 if self.input_images.isChecked():
                     undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
-                #self.load_image_forWarp(undistorted_frame)
+                #self.load_image_forWarp(undistorted_frame) # wanst the filename not the frame
+                
+                #################################################
+                # Add Rotate 90* clockwise and add grid 1m x 1m #
+                #################################################
 
                 undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
                 self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
@@ -1299,9 +1303,7 @@ class CameraWidget(QWidget):
                         #self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy())
 
-
                         self.display_dewarped_frame(self.dewarped_frame)
-                        ##################################################
 
                         # Print stuff and update status bar
                         print("Dewarping process completed.")
@@ -1348,8 +1350,6 @@ class CameraWidget(QWidget):
             # Disable the first tab (Camera Calibration)
             self.tabs.setTabEnabled(0, False) # Should not be here !
 
-            #########################################################################
-
             # Clear Image from self.imageFrame
             self.cameraFrame.setPixmap(QPixmap())
             self.imageFrame.setPixmap(QPixmap()) 
@@ -1377,16 +1377,17 @@ class CameraWidget(QWidget):
         if self.image_tuning_dewarp == False:
             print("Landmark collection is started")
 
-            # Start collecting landmarks with mouse clicks
+            # Start collecting landmarks with mouse clicks - Add zoom with Z at landmark TODO
             self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
         if self.image_tuning_dewarp == True:
             print("Perspective Tuning is started")
 
-            # Stop mouse press event registration
+            # Stop mouse and key press event registration
             # self.imageFrame.mousePressEvent = None
+            # self.imageFrame.keyPressEvent = None
 
-            # Start collecting arrow key events --> TEST TODO Ths is not the correct way
+            # Start collecting arrow key events
             self.imageFrame.keyPressEvent = self.keypress_tuning_event
 
         # Starts a loop collecting points
@@ -1465,6 +1466,7 @@ class CameraWidget(QWidget):
                     
                     # Stop mouse press event registration
                     self.imageFrame.mousePressEvent = None
+                    # self.imageFrame.keyPressEvent = None
 
                 if self.image_tuning_dewarp == True:
                     # tune self.point before processing them when tuning is enabled
@@ -1482,17 +1484,17 @@ class CameraWidget(QWidget):
             QApplication.processEvents()
 
         print(
-            f"Check UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}"
-        )  # is using wrong values -> cameraFrame
+            f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}"
+        )
         print(
-            f"Check cameraFrame| W: {self.cameraFrame.width()}, H: {self.cameraFrame.height()}, Supersample: {self.supersample}"
-        )  # is using wrong values -> cameraFrame
+            f"Check imageFrame| W: {self.imageFrame.width()}, H: {self.imageFrame.height()}, Supersample: {self.supersample}"
+        )
 
-        # TODO is CameraFrame the best option?
-        # TODO Why do we need to change the order of last two points?
+        # TODO Why do we need to change the order of last two points? ->> Check top for sorting
         # Can we fix this sorting without hard-coding to the config?
         warper = Warper(
-            points=np.array([self.points[0], self.points[1], self.points[3], self.points[2]]),
+            #points=np.array([self.points[0], self.points[1], self.points[3], self.points[2]]),
+            points=np.array([self.points[0], self.points[1], self.points[2], self.points[3]]),
             landmark_points=self.landmark_points,
             width=self.cameraFrame.width(),
             height=self.cameraFrame.height(),
@@ -1553,17 +1555,15 @@ class CameraWidget(QWidget):
 
         return image
 
-    # Different way to display dewarped image and image landmark
-
+    # Image loading for tab2 - image
     def display_dewarped_frame(self, dewarped_frame):
         # Display the dewarped image
         dewarped_pixmap = self.imageToPixmap(dewarped_frame)
         self.imageFrame.setPixmap(dewarped_pixmap)
         self.imageFrame.setScaledContents(True)
 
-    #######################################################
         
-    # DeWarped Image loading for tab2
+    # Image file loading for tab2 - filename
     def display_dewarped_image(self, file_name):
 
         print(f"Filename is: {file_name}")
@@ -1572,8 +1572,6 @@ class CameraWidget(QWidget):
             # Image loading and processing logic here
             self.cv_image = cv2.imread(file_name)
             self.cv_image_rgb = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2RGB)  # Corrected color conversion
-
-            # Add grid + rotate 90 degree clockwise
 
             # Covert to Pixmap and other operations...
             pixmap = self.imageToPixmap(self.cv_image_rgb)
@@ -1785,10 +1783,6 @@ class CameraWidget(QWidget):
                 print(f"Camera Matrix:\n{self.camera_matrix}")
                 print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
-                # Apply camera correction if any set ( Add Selection opion for Fish-Eye TODO)
-                #undistorted_frame = self.undistort_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
-                #undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
-
                 # Not really needed since images now always use fisheye, but prep for fisheye toggle
                 if self.input_images.isChecked():
                     undistorted_frame = self.undistort_fisheye_frame(self.cv_image.copy(), self.camera_matrix, self.camera_dist_coeff)
@@ -1802,7 +1796,6 @@ class CameraWidget(QWidget):
                 self.dewarped_frame = self.warper_result.warp(undistorted_frame)
 
                 # Update the display with the dewarped image
-                #self.display_dewarped_image(self.dewarped_frame)
                 self.display_dewarped_frame(self.dewarped_frame)
 
             else:
@@ -1902,10 +1895,11 @@ class CameraWidget(QWidget):
         # mat = cv2.imread('image.jpg')
         filename = "mat.bin"
         mat = self.dewarped_frame
-        # self.save_mat_binary('mat.bin', mat)
-        # loaded_mat = cv2.imread('mat.bin')
-        #print ("Saving to binary file <name> and saving Mat image")
-        #return self.save_mat_binary('mat.bin', mat)
+
+        #################################################
+        # Add function to create lookup table x,y,angle #
+        #################################################
+
         print(f"Saving to binary file {filename} and saving Mat image")
         return self.save_mat_binary(filename, mat)
 
@@ -1936,9 +1930,7 @@ class CameraWidget(QWidget):
     # Example usage:
     # mat = cv2.imread('image.jpg')
     # self.save_mat_binary('mat.bin', mat)
-    # loaded_mat = cv2.imread('mat.bin')
-        
-    #############################################################    
+    # loaded_mat = cv2.imread('mat.bin') 
 
     def close_application(self):
         QApplication.quit()

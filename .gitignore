@@ -165,6 +165,7 @@ dump/
 mrcal/
 #test/
 tmp_data/
+video/
 
 # Ignored files
 *.log
