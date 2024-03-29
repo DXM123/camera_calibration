@@ -534,7 +534,7 @@ class CameraWidget(QWidget):
             imageFrameWidth = self.imageFrame.size().width()
 
             # Print the cameraFrame width
-            print(f"cameraFrame Width: {imageFrameWidth}")
+            #print(f"cameraFrame Width: {imageFrameWidth}")
 
             # Set the buttons to the same width as cameraFrame
             self.doneButton1.setFixedWidth(imageFrameWidth)
@@ -542,8 +542,9 @@ class CameraWidget(QWidget):
 
             if self.imageFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
-                    
-                self.update_image_feed(self.cv_image) 
+                
+                # Below is extra compared to load_image to undistort TODO
+                self.update_image_feed(self.cv_image)
 
             else:
                 self.processoutputWindow.setText("Problem displaying image")
@@ -627,12 +628,7 @@ class CameraWidget(QWidget):
             undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
             
-            # TODO Use cameraFrame for tab1 and imageFrame for tab2
-            #if self.tab1.isActiveWindow():
-            #    self.cameraFrame.setPixmap(self.pixmap)
-            #else:
-            #    self.imageFrame.setPixmap(self.pixmap)
-
+            # Use cameraFrame for tab1 and imageFrame for tab2
             if self.tabs.currentIndex() == 0:  # tab1 is at index 0
                 self.cameraFrame.setPixmap(self.pixmap)
             elif self.tabs.currentIndex() == 1:  # tab2 is at index 1
@@ -918,8 +914,6 @@ class CameraWidget(QWidget):
             print(f"Need {self.config.min_cap} images with corners, only {len(self.object_points)} found")
         
 
-    
-    #######################################################################
 
     def perform_calibration_fisheye(self):
         print(f"test_calibration is set to: {self.test_started}")
@@ -989,8 +983,6 @@ class CameraWidget(QWidget):
                 self.camera_matrix = K
                 self.camera_dist_coeff = D
 
-                ########################COPY FROM ABOVE################################
-
                 # Save intrinsic parameters to intrinsic.txt
                 #if self.test_started == False:
                 if self.test_started == True: # TODO Not triggered when set to False
@@ -1018,7 +1010,6 @@ class CameraWidget(QWidget):
                     self.outputWindow.setText(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
                     print(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
 
-                    ###########################
 
             except cv2.error as e:
                 print(f"Calibration failed with error: {e}")
@@ -1026,7 +1017,6 @@ class CameraWidget(QWidget):
         else:
             print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
 
-    ######################################################################
 
 
     def generate_object_points(self, columns, rows, square_size):
@@ -1050,9 +1040,6 @@ class CameraWidget(QWidget):
         if self.input_camera.isChecked():
             self.timer.start(100) # Start camera feed
             self.perform_calibration()
-
-        # Set test boolean to prevent mutiple saves
-        #self.test_started = True
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....")
@@ -1085,8 +1072,6 @@ class CameraWidget(QWidget):
             print("No camera matrix or distortion coefficient detected, showing original frame")
 
             return frame
-
-    ############################################################################################
         
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv
     def undistort_fisheye_frame_prev(self, frame, camera_matrix, distortion_coefficients):
@@ -1188,8 +1173,6 @@ class CameraWidget(QWidget):
         undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
         return undistorted_frame
-        
-    #################################################################################################
 
 
     def save_calibration(self):
@@ -1267,53 +1250,10 @@ class CameraWidget(QWidget):
             # Set image Dewarp to True
             self.image_dewarp = True  # TODO Does not below here
 
-            print("Image Loaded ....")
             print(f"Calibration imported is: {self.cal_imported}")
+            print(f"Loading file_name type: {type(file_name)}, file_name value: {file_name}")
 
-            #####################################################################################
-            # Add up update_image_feed
-            # TODO: Space still working for looping through images only 1 image should be used?
-            # Clear the variable containing the list of images?
-
-            self.load_image_forWarp(file_name)
-
-            #####################################################################################
-
-            # Load the image using OpenCv
-            #self.cv_image = cv2.imread(file_name)
-            #self.cv_image = cv2.cvtColor(self.cv_image, cv2.COLOR_RGB2BGR)
-
-            # Covert to Pixmap
-            #pixmap = self.imageToPixmap(self.cv_image)  ## Test
-
-            # Show stuff
-            #self.imageFrame.setPixmap(pixmap)
-            #self.imageFrame.setScaledContents(False)  # Set to false to prevent issues with aspect ratio
-
-            # Adjust imageFrame size to exactly match the pixmap size needed for proper mouse x,y
-            #self.imageFrame.setFixedSize(pixmap.size())
-
-            # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
-            # Get the width of cameraFrame
-            #imageFrameWidth = self.imageFrame.size().width()
-
-            # Print the cameraFrame width
-            #print(f"imageFrame Width: {imageFrameWidth}")
-
-            # Set the buttons to the same width as cameraFrame
-            #self.startButtonPwarp.setFixedWidth(imageFrameWidth)
-            #self.loadImage.setFixedWidth(imageFrameWidth)
-
-            # TODO check pixmap set is not none
-            if self.imageFrame.pixmap() is not None:
-                self.processoutputWindow.setText("Image loaded")
-
-                # Prevent input until started
-                #self.imageFrame.mousePressEvent = None
-                #self.imageFrame.keyPressEvent = None
-
-            else:
-                self.processoutputWindow.setText("Problem displaying image")
+            self.display_dewarped_image(file_name)
 
     def start_pwarp(self):
         # Stop Camera -> also stopped after save
@@ -1329,7 +1269,20 @@ class CameraWidget(QWidget):
                 print("Image Perspective Warp started")
                 self.update_status_signal.emit("Image Perspective Warp started")
 
+                # Use frame from load_image? 
                 frame = self.cv_image
+                #frame = self.imageFrame.pixmap()
+
+                if self.input_images.isChecked():
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+
+                #self.load_image_forWarp(undistorted_frame)
+
+                undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+                self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
+                #self.pixmap = self.imageToPixmap(undistorted_frame)
 
                 # Check if 'frame' is a valid NumPy array
                 if isinstance(frame, np.ndarray):
@@ -1338,18 +1291,17 @@ class CameraWidget(QWidget):
 
                     if len(frame.shape) == 3:  # Verify if valid frame shape
 
-                        self.warper_result = self.dewarp(frame)  # return warper
-
-                        if self.input_images.isChecked():
-                            undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                        else:
-                            undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                        #self.warper_result = self.dewarp(frame)  # return warper
+                        #self.warper_result = self.dewarp(undistorted_frame)  # return warper 
+                        self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                        
 
                         # Perform dewarping
-                        self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
+                        #self.dewarped_frame = self.warper_result.warp(undistorted_frame.copy())
+                        self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy())
 
-                        # Update the display with the dewarped image
-                        self.display_dewarped_image(self.dewarped_frame)
+
+                        self.display_dewarped_frame(self.dewarped_frame)
+                        ##################################################
 
                         # Print stuff and update status bar
                         print("Dewarping process completed.")
@@ -1365,14 +1317,6 @@ class CameraWidget(QWidget):
 
                             # disconnect the previous connection
                             self.startButtonPwarp.clicked.disconnect(self.start_pwarp)
-
-                        # TODO next steps - Tweak landmarks
-                        #self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
-
-                        #if self.image_tuning_dewarp == False:
-                        #    self.startButtonPwarp.clicked.disconnect(
-                        #        self.start_pwarp
-                        #    )  # disconnect the previous connection
 
                     else:
                         print("Invalid frame format: Not a 3D array (color image)")
@@ -1567,6 +1511,13 @@ class CameraWidget(QWidget):
         # Disable widget -> Maybe a bit much
         self.imageFrame.setEnabled(False)
 
+        # First, disconnect all previously connected signals to avoid multiple connections.
+        try:
+            self.startButtonPwarp.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
+
         # Set save options TODO
         self.startButtonPwarp.setText("Save to binary file")
         self.startButtonPwarp.clicked.connect(self.save_prep_mat_binary)
@@ -1604,11 +1555,56 @@ class CameraWidget(QWidget):
 
     # Different way to display dewarped image and image landmark
 
-    def display_dewarped_image(self, dewarped_frame):
+    def display_dewarped_frame(self, dewarped_frame):
         # Display the dewarped image
         dewarped_pixmap = self.imageToPixmap(dewarped_frame)
         self.imageFrame.setPixmap(dewarped_pixmap)
         self.imageFrame.setScaledContents(True)
+
+    #######################################################
+        
+    # DeWarped Image loading for tab2
+    def display_dewarped_image(self, file_name):
+
+        print(f"Filename is: {file_name}")
+
+        if file_name:
+            # Image loading and processing logic here
+            self.cv_image = cv2.imread(file_name)
+            self.cv_image_rgb = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2RGB)  # Corrected color conversion
+
+            # Add grid + rotate 90 degree clockwise
+
+            # Covert to Pixmap and other operations...
+            pixmap = self.imageToPixmap(self.cv_image_rgb)
+
+            # Set loaded image in CameraFrame
+            self.imageFrame.setPixmap(pixmap)
+            self.imageFrame.setScaledContents(False) # Never Scale
+
+            # Adjust cameraFrame size to match the pixmap size - Set Fixed Size like imageFrame
+            self.imageFrame.setFixedSize(pixmap.size())
+
+            # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
+            # Get the width of cameraFrame
+            imageFrameWidth = self.imageFrame.size().width()
+
+            # Print the cameraFrame width
+            #print(f"cameraFrame Width: {imageFrameWidth}")
+
+            # Set the buttons to the same width as cameraFrame
+            self.doneButton1.setFixedWidth(imageFrameWidth)
+            self.captureButton1.setFixedWidth(imageFrameWidth)
+
+            if self.imageFrame.pixmap() is not None:
+                self.processoutputWindow.setText("Image loaded")
+                    
+                self.update_image_feed(self.cv_image) 
+
+            else:
+                self.processoutputWindow.setText("Problem displaying image")
+
+    #######################################################
 
     def display_landmarks(self, image):
         height, width, channel = image.shape
@@ -1636,7 +1632,25 @@ class CameraWidget(QWidget):
             if self.imageFrame.pixmap() is not None:
                 self.points.append((x, y))
                 self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Might cause flickering
-                bgimage = cv2.rectangle(self.cv_image, (x, y), (x + 2, y + 2), (SoccerFieldColors.Green.value), 2)
+                ######################################################################################
+
+                # Use frame from load_image? 
+                frame = self.cv_image
+                #frame = self.imageFrame.pixmap()
+
+                if self.input_images.isChecked():
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+
+                #self.load_image_forWarp(undistorted_frame)
+
+                undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+                #self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
+                #self.pixmap = self.imageToPixmap(undistorted_frame)
+
+                ######################################################################################
+                bgimage = cv2.rectangle(undistorted_frame_rgb, (x, y), (x + 2, y + 2), (SoccerFieldColors.Green.value), 2)
                 self.display_landmarks(bgimage)
             else:
                 print("Pixmap is not set")
@@ -1788,7 +1802,8 @@ class CameraWidget(QWidget):
                 self.dewarped_frame = self.warper_result.warp(undistorted_frame)
 
                 # Update the display with the dewarped image
-                self.display_dewarped_image(self.dewarped_frame)
+                #self.display_dewarped_image(self.dewarped_frame)
+                self.display_dewarped_frame(self.dewarped_frame)
 
             else:
                 print("Pixmap is not set")
