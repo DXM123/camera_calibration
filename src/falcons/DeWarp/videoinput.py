@@ -2,7 +2,6 @@
 
 import cv2
 import numpy as np
-import pyautogui # needed for screenshotting
 
 
 
@@ -10,23 +9,11 @@ DEFAULT_INPUT = 0 # argument for opencv VideoCapture, maps to /dev/video0
 
 
 
-class FeedScreenShot():
-    """Standard image provider to obtain a screenshot."""
-    def __init__(self):
-        # display screen resolution, get it using pyautogui itself
-        self.resolution = tuple(pyautogui.size())
-    def get(self):
-        # make a screenshot
-        img = pyautogui.screenshot()
-        # TODO: figure out a way to (optionally) include mouse cursor? see https://stackoverflow.com/a/60266466
-        # convert these pixels to a proper numpy array to work with OpenCV
-        frame = np.array(img)
-        return frame
 
 
 class FeedVideoCapture():
     """Standard image provider to obtain a frame from any video source."""
-    def __init__(self, video=0, repeat_last_when_failing=False):
+    def __init__(self, video=DEFAULT_INPUT, repeat_last_when_failing=False):
         self.cap = cv2.VideoCapture(video)
         self.repeat_last_when_failing = repeat_last_when_failing
         self.frame = None # keep last frame in memory
@@ -51,8 +38,7 @@ class VideoInput():
     or anything else acceptable by openCV VideoCapture."""
     def __init__(self, input=DEFAULT_INPUT):
         if input == 'screen':
-            self.mode = 'screen'
-            self.feed = FeedScreenShot()
+            raise NotImplementedError('stripped functionality that was depending on pyautogui')
         else:
             if input is None:
                 input = DEFAULT_INPUT
