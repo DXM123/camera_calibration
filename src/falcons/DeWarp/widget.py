@@ -118,8 +118,8 @@ class CameraWidget(QWidget):
             ]
         )
 
-        # Add the supersample attribute
-        self.supersample = 2
+        # Add the supersample attribute TODO move to config
+        self.supersample = 2 # when using 1 output not usable
 
         ############################
         # ..:: Start UI layout ::..#
@@ -1441,8 +1441,10 @@ class CameraWidget(QWidget):
         warper = Warper(
             points=np.array([self.points[0], self.points[1], self.points[2], self.points[3]]),
             landmark_points=self.landmark_points,
-            width=self.cameraFrame.width(),
-            height=self.cameraFrame.height(),
+            #width=self.cameraFrame.width(),
+            #height=self.cameraFrame.height(),
+            width=self.imageFrame.width(),
+            height=self.imageFrame.height(),
             supersample=self.supersample,
         )
 
@@ -1767,33 +1769,6 @@ class CameraWidget(QWidget):
             print(f"Moved point {direction}")
             return (x + 1, y)
         return point
-
-    # do i need this or can i use display_dewarped_image again
-    # TODO this should just call the `Warper`
-    def update_perspective_transform(self, pts1, pts2):
-        self.frame = self.cv_image
-
-        # Call the height and width method to get the actual value of the frame
-        W = self.imageFrame.width()
-        H = self.imageFrame.height()
-
-        # Update and display the perspective-transformed image
-        self.pts1 = np.array(pts1)
-        self.landmark_points = np.array(pts2)
-
-        M = cv2.getPerspectiveTransform(self.pts1.astype(np.float32), self.landmark_points.astype(np.float32))
-
-        supersample = self.supersample
-
-        if self.frame is None:
-            self.frame = cv2.warpPerspective(self.frame, M, (W * supersample, H * supersample))
-        else:
-            self.frame[:] = cv2.warpPerspective(
-                self.frame, M, (W * supersample, H * supersample)
-            )  # -> issue using from frame.shape-
-
-        # Convert the adjusted image to QPixmap and display it
-        self.display_landmarks(self.frame)  # TODO
 
     def tweak_pwarp(self):
         # Print new instruction
