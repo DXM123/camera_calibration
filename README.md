@@ -68,5 +68,4 @@ Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
 
 **Warp Example:**
 
-![Screenshot from 2024-03-29 16-23-59](https://github.com/DXM123/camera_calibration/assets/19300348/5ec8d01b-8409-4f52-a0fc-0d001980bbaf)
-
+![Screenshot from 2024-04-01 13-51-49](https://github.com/DXM123/camera_calibration/assets/19300348/0c55fe8f-8d00-4055-984e-11ad7b517327)
