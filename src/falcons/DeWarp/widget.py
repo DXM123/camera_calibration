@@ -1242,11 +1242,17 @@ class CameraWidget(QWidget):
                     self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
 
                     if len(frame.shape) == 3:  # Verify if valid frame shape
-
-                        self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                        
+                        
+                        ## Add some checks to not recalculate everything all the time when TODO
+                        # We only need warper result once !
+                        # self.image_tuning_dewarp == True
+                        #if self.image_tuning_dewarp != True:
+                            # Also pass undistorted_frame as src and self.field_image as dst
+                        self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper  
+                            #self.warper_result = self.dewarp(undistorted_frame_rgb, self.field_image)  # return warper                       
 
                         # Perform dewarping
-                        self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy())
+                        self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
 
                         #######################################################
                         # Add Rotate 90 degree clockwise and add grid 1m x 1m #
@@ -1320,6 +1326,8 @@ class CameraWidget(QWidget):
                 self, "Warning!", f"No Image detected.\n\nPlease make sure an Image is loaded", QMessageBox.Ok
             )
 
+    #########################################################################################################
+            
     def dewarp(self, img):
         # Add check if Tuning is started TODO
         bgimage = img.copy()
@@ -1432,19 +1440,18 @@ class CameraWidget(QWidget):
 
         print(
             f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}"
-        )
-        print(
             f"Check imageFrame| W: {self.imageFrame.width()}, H: {self.imageFrame.height()}, Supersample: {self.supersample}"
+            f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}, Supersample: {self.supersample}"
         )
 
         # TODO Can we fix this sorting without hard-coding to the config?
         warper = Warper(
             points=np.array([self.points[0], self.points[1], self.points[2], self.points[3]]),
             landmark_points=self.landmark_points,
-            #width=self.cameraFrame.width(),
-            #height=self.cameraFrame.height(),
-            width=self.imageFrame.width(),
-            height=self.imageFrame.height(),
+            #width=self.imageFrame.width(), # use img.shape[1]
+            #height=self.imageFrame.height(), # use img.shape[0]
+            width=img.shape[1],
+            height=img.shape[0],
             supersample=self.supersample,
         )
 
@@ -1523,19 +1530,16 @@ class CameraWidget(QWidget):
             # Covert to Pixmap and other operations...
             pixmap = self.imageToPixmap(self.cv_image_rgb)
 
-            # Set loaded image in CameraFrame
+            # Set loaded image in ImageFrame
             self.imageFrame.setPixmap(pixmap)
             self.imageFrame.setScaledContents(False) # Never Scale
 
-            # Adjust cameraFrame size to match the pixmap size - Set Fixed Size like imageFrame
+            # Adjust imageFrame size to match the pixmap size - Set Fixed Size like imageFrame
             self.imageFrame.setFixedSize(pixmap.size())
 
             # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
             # Get the width of cameraFrame
             imageFrameWidth = self.imageFrame.size().width()
-
-            # Print the cameraFrame width
-            #print(f"cameraFrame Width: {imageFrameWidth}")
 
             # Set the buttons to the same width as cameraFrame
             self.doneButton1.setFixedWidth(imageFrameWidth)
@@ -1561,9 +1565,6 @@ class CameraWidget(QWidget):
         if event.button() == Qt.LeftButton:
             x = event.x()
             y = event.y()
-
-            # Print the x, y coordinates
-            # print(f"Mouse clicked at x: {x}, y: {y}")
 
             # Debug Mouse events
             print(f"Clicked at local coordinates: ({event.x()}, {event.y()})")
@@ -1737,7 +1738,8 @@ class CameraWidget(QWidget):
                         self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                        
 
                         # Perform dewarping
-                        self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy())
+                        #self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy())
+                        self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
 
                         #######################################################
                         # Add Rotate 90 degree clockwise and add grid 1m x 1m #
