@@ -36,14 +36,14 @@ class FeedVideoCapture():
 class VideoInput():
     """Video input, either taken from 'screen', or something like '/dev/video1',
     or anything else acceptable by openCV VideoCapture."""
-    def __init__(self, input=DEFAULT_INPUT):
-        if input == 'screen':
+    def __init__(self, video_input=DEFAULT_INPUT):
+        if video_input == 'screen':
             raise NotImplementedError('stripped functionality that was depending on pyautogui')
         else:
-            if input is None:
-                input = DEFAULT_INPUT
+            if video_input is None:
+                video_input = DEFAULT_INPUT
             self.mode = 'video'
-            self.feed = FeedVideoCapture(input, repeat_last_when_failing=True)
+            self.feed = FeedVideoCapture(video_input, repeat_last_when_failing=True)
         self.resolution = self.feed.resolution
 
     def get(self):
