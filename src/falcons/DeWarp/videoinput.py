@@ -13,9 +13,9 @@ DEFAULT_INPUT = 0 # argument for opencv VideoCapture, maps to /dev/video0
 
 class FeedVideoCapture():
     """Standard image provider to obtain a frame from any video source."""
-    def __init__(self, video=DEFAULT_INPUT, repeat_last_when_failing=False):
+    def __init__(self, video=DEFAULT_INPUT, cycle_video=False):
         self.cap = cv2.VideoCapture(video)
-        self.repeat_last_when_failing = repeat_last_when_failing
+        self.cycle_video = cycle_video
         self.frame = None # keep last frame in memory
         # determine resolution
         frame = self.get() # for example (480, 640, 3)
@@ -27,9 +27,9 @@ class FeedVideoCapture():
             self.frame = frame # store last
             return frame
         else:
-            if self.repeat_last_when_failing:
-                # in case of using a video file, at end of stream: keep feeding last frame
-                return self.frame
+            if self.cycle_video:
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Reset to the beginning of the video
+                return self.get()  # Read the first frame again
         raise Exception('could not read video frame')
 
 
@@ -43,7 +43,7 @@ class VideoInput():
             if video_input is None:
                 video_input = DEFAULT_INPUT
             self.mode = 'video'
-            self.feed = FeedVideoCapture(video_input, repeat_last_when_failing=True)
+            self.feed = FeedVideoCapture(video_input, cycle_video=True)
         self.resolution = self.feed.resolution
 
     def get(self):
