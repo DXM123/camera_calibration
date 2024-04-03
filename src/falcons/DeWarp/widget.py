@@ -88,12 +88,6 @@ class CameraWidget(QWidget):
         # Add dewarped frame
         self.dewarped_frame = None
 
-        # Store Warper
-        #self.warper = None
-
-        # Add check for calculating Warper once
-        #self.warper_created = False
-
         # Add field_image Temp
         self.field_image = None
 
@@ -113,8 +107,8 @@ class CameraWidget(QWidget):
         self.points = []
         self.selected_point = 0  # Index of the selected point for tuning dewarp
 
-        # self.landmark_points = []
         # Also part of Warper Class
+        # TODO Add logic to define landmark based on cam id [0-3]
         self.landmark_points = np.array(
             [
                 self.config.field_coordinates_lm1,
@@ -123,7 +117,6 @@ class CameraWidget(QWidget):
                 self.config.field_coordinates_lm4,
             ]
         )
-
 
         ############################
         # ..:: Start UI layout ::..#
@@ -220,9 +213,9 @@ class CameraWidget(QWidget):
 
         self.optionsFrame.layout.addLayout(self.input_layout)
 
-        #===============================================================
-        # Add Camera Lens Options (Height and Fisheye toggle) (TODO)
-        #===============================================================
+        #=========================================================================
+        # Add Camera Lens Options (Height for Az Angle and Fisheye toggle) (TODO)
+        #=========================================================================
 
         # Add options widgets to optionsFrame:
         option_label = QLabel("Chessboard Options:")
@@ -425,7 +418,6 @@ class CameraWidget(QWidget):
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
-
     def update_capture_button_state(self):
         # First, disconnect all previously connected signals to avoid multiple connections.
         try:
@@ -505,7 +497,6 @@ class CameraWidget(QWidget):
 
             if self.cameraFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
-                
                 self.update_image_feed(self.cv_image) 
 
             else:
@@ -742,7 +733,6 @@ class CameraWidget(QWidget):
         self.outputWindow.setText(f"Screenshot saved:\n{filename}\nTotal Images Collected: {self.ImagesCounter}")
         #print(f"Frame Shape = {frame.shape[:2]}") # wrong way around
         print(f"Frame Shape = (Width: {frame.shape[1]}, Height: {frame.shape[0]})")
-
         print(f"Screenshot saved:\n {filename}\nTotal Images Collected: {self.ImagesCounter}")
 
     # Check collected images with corners and start calibration if ok
@@ -923,15 +913,16 @@ class CameraWidget(QWidget):
                     (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
                 )
 
+                # Check if the Root Mean Square (RMS) error is below threshold                    
+                self.evaluate_calibration(rms)
+
                 self.outputWindow.setText(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
                 print(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
-                print(f"The RMS Error is: {rms}")
 
                 self.camera_matrix = K
                 self.camera_dist_coeff = D
 
                 # Save intrinsic parameters to intrinsic.txt
-                #if self.test_started == False:
                 if self.test_started == True: # TODO Not triggered when set to False
                     with open(f"{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file:
                         file.write("Camera Matrix:\n")
@@ -964,7 +955,39 @@ class CameraWidget(QWidget):
         else:
             print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
 
+    def verify_rms(self, rms):
+        # Exceptional: RMS < 0.1
+        if rms < 0.1:
+            return "Exceptional"
 
+        # Very Good: 0.1 <= RMS < 0.3
+        elif rms < 0.3:
+            return "Very Good"
+
+        # Good: 0.3 <= RMS < 0.5
+        elif rms < 0.5:
+            return "Good"
+
+        # Acceptable: 0.5 <= RMS < 1.0
+        elif rms < 1.0:
+            return "Not Acceptable"
+
+        # Poor: RMS >= 1.0
+        else:
+            return "Very Poor"
+
+    def evaluate_calibration(self, rms):
+        # Check RMS and categorize calibration quality
+        quality = self.verify_rms(rms)
+
+        # Print message or raise error based on RMS quality
+        if quality in ["Exceptional", "Very Good", "Good"]:
+            #print(f"RMS is {rms}, indicating {quality} calibration quality.")
+            green_bold = "\033[32m\033[1m"
+            reset = "\033[0m"  # Resets the style to default
+            print(f"{green_bold}RMS is {rms}, indicating {quality} calibration quality.{reset}")
+        else:
+            raise ValueError(f"RMS is {rms}, indicating Poor calibration quality. Recalibration required.")
 
     def generate_object_points(self, columns, rows, square_size):
         objp = np.zeros((1, columns * rows, 3), np.float32)
@@ -1224,7 +1247,7 @@ class CameraWidget(QWidget):
                 print("Starting usb camera de-warp")  # -> update status
 
                 # Start the camera again
-                self.timer.start(100)  # Assuming 100 milliseconds per frame update (fast is 20)
+                self.timer.start(100)  # Assuming 100 milliseconds per frame update
 
                 # TODO
                 ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
@@ -1346,9 +1369,6 @@ class CameraWidget(QWidget):
                 # Enable Start button again when all 4 points are collected
                 self.startButtonPwarp.setDisabled(False)
 
-                # Rename startButtonPwarp to <START Perspective-warp>
-                #self.startButtonPwarp.setText("START Perspective-warp")
-
                 # Stop mouse press event registration
                 #self.imageFrame.mousePressEvent = None
 
@@ -1357,8 +1377,6 @@ class CameraWidget(QWidget):
                     # Stop mouse press event registration
                     self.imageFrame.mousePressEvent = None
                     # self.imageFrame.keyPressEvent = None
-
-                    # Rename start
 
                 if self.image_tuning_dewarp == True:
 
@@ -1375,13 +1393,10 @@ class CameraWidget(QWidget):
             f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}"
         )
 
-
         # TODO Can we fix this sorting without hard-coding to the config?
         self.warper = Warper(
             points=np.array([self.points[0], self.points[1], self.points[2], self.points[3]]),
             landmark_points=self.landmark_points,
-            #width=self.imageFrame.width(), # use img.shape[1]
-            #height=self.imageFrame.height(), # use img.shape[0]
             width=img.shape[1],
             height=img.shape[0],
         )            
@@ -1436,7 +1451,7 @@ class CameraWidget(QWidget):
         landmark = (int(landmark[0]), int(landmark[1]))
 
         # Draw the landmark selector
-        cv2.circle(image, landmark, 30, (color), 3)  # Meganta circle for landmark selection while tuning
+        cv2.circle(image, landmark, 30, (color), 5)
 
         return image
 
@@ -1712,21 +1727,6 @@ class CameraWidget(QWidget):
         self.start_pwarp()
 
     ####################### Binary file stuff WIP ###################
-        
-    def write_mat_binary_old(self, ofs, out_mat):
-        if not ofs:
-            return False
-        if out_mat is None:
-            s = 0
-            ofs.write(s.to_bytes(4, byteorder='little'))
-            return True
-        rows, cols = out_mat.shape[:2]
-        dtype = out_mat.dtype
-        ofs.write(rows.to_bytes(4, byteorder='little'))
-        ofs.write(cols.to_bytes(4, byteorder='little'))
-        ofs.write(np.uint32(dtype).tobytes())
-        ofs.write(out_mat.tobytes())
-        return True
     
     def write_mat_binary(self, ofs, out_mat):
         if not ofs:
@@ -1736,18 +1736,15 @@ class CameraWidget(QWidget):
             ofs.write(s.to_bytes(4, byteorder='little'))
             return True
         rows, cols = out_mat.shape[:2]
-        dtype = out_mat.dtype.itemsize  # Corrected line
+        dtype = out_mat.dtype.itemsize
         ofs.write(rows.to_bytes(4, byteorder='little'))
         ofs.write(cols.to_bytes(4, byteorder='little'))
         ofs.write(np.uint32(dtype).tobytes())
         ofs.write(out_mat.tobytes())
         return True
     
-    ##################################################################
-    
     def save_prep_mat_binary(self):
-        # Example usage:
-        # mat = cv2.imread('image.jpg')
+        # Set Filename static for now TODO 
         filename = "mat.bin"
 
         ######################################################
@@ -1758,12 +1755,9 @@ class CameraWidget(QWidget):
         print(f"Saving to binary file {filename} and saving Mat image")
         return self.save_mat_binary(filename, mat)
 
-    #################################################################
-
     def save_mat_binary(self, filename, output):
         with open(filename, 'wb') as ofs:
             return self.write_mat_binary(ofs, output)
-
 
     def read_mat_binary(self, ifs, in_mat):
         if not ifs:

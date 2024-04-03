@@ -81,7 +81,7 @@ class Warper(object):
         rotated_img = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
         return rotated_img
             
-    #def warp(self, img):
+
     def warp(self, src_img, dst_img):
 
         print(f"Executing warpPerspective, src_width={src_img.shape[1]}, src_height={src_img.shape[0]}, dst_width={dst_img.shape[1]}, dst_height={dst_img.shape[0]}")
@@ -111,6 +111,7 @@ class Warper(object):
         #self.draw_grid(result_img)
 
         return self.merged
+    
     
     def merge_views(self, dst, view, blend_factor=0.6):
         # Ensure blend_factor is within the valid range

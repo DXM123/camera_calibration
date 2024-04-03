@@ -3,6 +3,9 @@ tmp_data: "./tmp_data"
 min_cap: 3  # minimum or images to be collected by capturing (Default is 10)
 countdown_seconds: 3 # Set the initial countdown time to save images with corners detected
 
+# Root Mean Square (RMS) error threshold
+rms_threshold : 0.3 # 0.3 and below is considered very good calibration result
+
 # Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns: 7  # number of columns of your Checkerboard
 no_of_rows: 7  # number of rows of your Checkerboard

@@ -102,29 +102,32 @@ class CamCalMain(QMainWindow):
             try:
                 with open(file_name, "r") as f:
                     data = json.load(f)
-                    #self.camera_matrix = data.get("camera_matrix")
-                    #self.camera_dist_coeff = data.get("dist_coeff")
 
                     # Load into camera widget variable
                     self.camera_widget.camera_matrix = data.get("camera_matrix")
                     self.camera_widget.camera_dist_coeff = data.get("dist_coeff")
 
+                    # Validate shape
+                    if self.camera_widget.camera_matrix.shape != (3, 3):
+                        raise ValueError("Camera matrix must be a 3x3 array.")
+
                     # Emit the signal with the updated status text
                     self.camera_widget.update_status_signal.emit(f"Calibration parameters loaded from {file_name}")
                     print(f"Calibration parameters loaded from {file_name}")
 
+                    # Debug print for camera matrix and distortion coefficients
+                    print(f"Camera Matrix:\n{self.camera_widget.camera_matrix}")
+                    print(f"Distortion Coefficients:\n{self.camera_widget.camera_dist_coeff}")
+
                     # Set tracker to True in camera_widget, needed in test_cam_calibration
                     self.camera_widget.cal_imported = True
-
-                    # Update button text TODO -> makes no sense now
-                    #self.camera_widget.captureButton1.setText("Capture Finished")
 
                     # Add logic to distinct loading in tab 1 or tab 2 TODO
 
                     # Disable Capture Button when import succeeded
                     self.camera_widget.captureButton1.setDisabled(True)
 
-                    # Start Camera when selected
+                    # Start Camera when selected -> but is selected by default -> set image as default?
                     #if self.camera_widget.input_camera.isChecked():
                     #    self.camera_widget.start_capture()
 
@@ -137,7 +140,7 @@ class CamCalMain(QMainWindow):
                         # If no connections exist, a TypeError is raised. Pass in this case.
                         pass
 
-                    # Update DONE button to Test Calibration
+                    # Update DONE button to Test Calibration -> only when tab 1 is active TODO
                     self.camera_widget.doneButton1.setText("Test Calibration")
                     self.camera_widget.doneButton1.clicked.connect(
                         self.camera_widget.test_calibration
