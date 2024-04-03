@@ -14,7 +14,6 @@ class Warper(object):
         landmark_points: np.ndarray,
         width: Union[int, float] = 640,
         height: Union[int, float] = 480,
-        supersample: Union[int, float] = 2,
         interpolation=None,
     ):
         self.config = get_config()
@@ -26,20 +25,18 @@ class Warper(object):
         assert isinstance(width, (int, float)) or not isinstance(
             height, (int, float)
         ), "Width and height should be numerical values."
-        assert isinstance(supersample, (int, float)), "Supersample should be a numerical value."
         
         #Give warper Class the attrbutes
         self.src_width = width
         self.src_height = height
         self.src_points = points
-        self.supersample = supersample
         self.landmark_points = landmark_points # Field Coordinate FCS
         self.dst = None
 
         #logging.info(
         print(
             "Following values used as input for Warper Class:"
-            f" \nWidth: {self.src_width}.\nHeight: {self.src_height}.\nSuperSample: {self.supersample}\n"
+            f" \nWidth: {self.src_width}.\nHeight: {self.src_height}.\n"
             f"Points: {self.src_points}.\nLandMarkPoints:{self.landmark_points}."
         )
 
@@ -60,7 +57,6 @@ class Warper(object):
             self.interpolation = interpolation
 
     # Now only Basic grid, needs to be more intelligent
-    # frame, Hv=M, boundaries_rcs_mm = ??
     def draw_grid(self, img):
         #grid_size = 50  # Grid size in pixel
         grid_size = self.config.ppm * 0.5
@@ -84,61 +80,30 @@ class Warper(object):
         # Perform the rotation
         rotated_img = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
         return rotated_img
-    
-    #def get_plan_view(src, dst):
-    #    #self.H, mask = cv2.findHomography(self.points.astype(np.float32), self.landmark_points.astype(np.float32), cv2.RANSAC,5.0)
-    #    src_pts = np.array(src_list).reshape(-1,1,2)
-    #    dst_pts = np.array(dst_list).reshape(-1,1,2)
-    #    H, mask = cv2.findHomography(src_pts, dst_pts, cv.RANSAC,5.0)
-    #    print("H:")
-    #    print(H)
-    #    plan_view = cv2.warpPerspective(src, H, (dst.shape[1], dst.shape[0]))
-    #    return plan_view
-
             
     #def warp(self, img):
     def warp(self, src_img, dst_img):
-        # Determine if resizing is necessary based on supersample value
-        # Seems we need resizing anyway, when set to 1 scaling is wrong
-        # Now set in widget to self.supersample = 2
-        resizing_needed = self.supersample != 1
 
-        print(f"Executing warpPerspective with supersample={self.supersample}, width={self.src_width}, height={self.src_height}, resulting size=({int(self.src_width * self.supersample)}, {int(self.src_height * self.supersample)})")
-        self.dst = cv2.warpPerspective(
-            src_img, self.M, (self.src_width * self.supersample, self.src_height * self.supersample)
-        )
+        print(f"Executing warpPerspective, src_width={src_img.shape[1]}, src_height={src_img.shape[0]}, dst_width={dst_img.shape[1]}, dst_height={dst_img.shape[0]}")
 
         self.plan_view = cv2.warpPerspective(
-            src_img, self.M, (dst_img.shape[1] * self.supersample, dst_img.shape[0] * self.supersample)
+            src_img, self.M, (dst_img.shape[1], dst_img.shape[0])
         )
 
+        # Merge both src and dst image
         self.merged = self.merge_views(src_img,dst_img, self.plan_view)
 
-        self.dst = self.merged
-        
-        # Describe the action being taken based on whether resizing is needed
-        action_description = "Resizing required" if resizing_needed else "No resizing needed"
-        print(f"{action_description} Super Sample is: {self.supersample}")
+        # Print the actual resulting image size after resizing or not
+        print(f"Result after merging: width={self.merged.shape[1]}, height={self.merged.shape[0]}")
+        cv2.imwrite(f'{self.config.tmp_data}/_after_merge.jpg', self.merged)
 
-        # Perform the necessary action: resizing if needed, or directly returning the warped image
-        if resizing_needed:
-            # Resize the image if supersampling is not equal to 1
-            print(f"Resizing image to width={self.src_width}, height={self.src_height} with interpolation={self.interpolation}")
-            result_img = cv2.resize(self.dst, (int(self.src_width), int(self.src_height)), interpolation=self.interpolation)
-        else:
-            # No resizing needed, use the warped image directly -> But odd output
-            result_img = self.dst
-
-        # Rotate the resulting image by 45 degrees
+        # Rotate the resulting image by 45 degree
         #result_img = self.rotate_image(result_img, angle=-45)
-
-        # Print the actual resulting image size
-        print(f"Resulting image size: width={result_img.shape[1]}, height={result_img.shape[0]}")
 
         # Draw grid on the resulting image
         #self.draw_grid(result_img)
 
-        return result_img
+        return self.merged
 
     def merge_views(self, src, dst, view):
         for i in range(0,dst.shape[0]):

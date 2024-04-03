@@ -88,6 +88,12 @@ class CameraWidget(QWidget):
         # Add dewarped frame
         self.dewarped_frame = None
 
+        # Store Warper
+        #self.warper = None
+
+        # Add check for calculating Warper once
+        #self.warper_created = False
+
         # Add field_image Temp
         self.field_image = None
 
@@ -118,8 +124,6 @@ class CameraWidget(QWidget):
             ]
         )
 
-        # Add the supersample attribute TODO move to config
-        self.supersample = 2 # when using 1 output not usable
 
         ############################
         # ..:: Start UI layout ::..#
@@ -1439,23 +1443,23 @@ class CameraWidget(QWidget):
             QApplication.processEvents()
 
         print(
-            f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}, Supersample: {self.supersample}"
-            f"Check imageFrame| W: {self.imageFrame.width()}, H: {self.imageFrame.height()}, Supersample: {self.supersample}"
-            f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}, Supersample: {self.supersample}"
+            f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}"
+            f"Check imageFrame| W: {self.imageFrame.width()}, H: {self.imageFrame.height()}"
+            f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}"
         )
 
+
         # TODO Can we fix this sorting without hard-coding to the config?
-        warper = Warper(
+        self.warper = Warper(
             points=np.array([self.points[0], self.points[1], self.points[2], self.points[3]]),
             landmark_points=self.landmark_points,
             #width=self.imageFrame.width(), # use img.shape[1]
             #height=self.imageFrame.height(), # use img.shape[0]
             width=img.shape[1],
             height=img.shape[0],
-            supersample=self.supersample,
-        )
+        )            
 
-        return warper
+        return self.warper
 
     def stop_tuning(self):
         self.image_tuning_dewarp == False
