@@ -116,14 +116,19 @@ class CamCalMain(QMainWindow):
                     # Set tracker to True in camera_widget, needed in test_cam_calibration
                     self.camera_widget.cal_imported = True
 
-                    # Update button text
-                    self.camera_widget.captureButton1.setText("Capture Finished")
+                    # Update button text TODO -> makes no sense now
+                    #self.camera_widget.captureButton1.setText("Capture Finished")
+
+                    # Add logic to distinct loading in tab 1 or tab 2 TODO
+
                     # Disable Capture Button when import succeeded
                     self.camera_widget.captureButton1.setDisabled(True)
 
                     # Start Camera when selected
-                    if self.camera_widget.input_camera.isChecked():
-                        self.camera_widget.start_capture()
+                    #if self.camera_widget.input_camera.isChecked():
+                    #    self.camera_widget.start_capture()
+
+                    #if self.camera_widget.input_images.isChecked():
 
                     # First, disconnect all previously connected signals to avoid multiple connections.
                     try:

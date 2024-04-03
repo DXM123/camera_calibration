@@ -308,7 +308,8 @@ class CameraWidget(QWidget):
         print(f"tab1inner initial size: {self.initialTab1InnerSize}")
 
         # Add Start De-warp Button last
-        self.startButtonPwarp = QPushButton("START Perspective-Warp", self.tab2inner)
+        # self.startButtonPwarp = QPushButton("START Perspective-Warp", self.tab2inner)
+        self.startButtonPwarp = QPushButton("START Selecting Landmarks", self.tab2inner)
         self.startButtonPwarp.clicked.connect(self.start_pwarp)
         self.tab2inner.layout.addWidget(self.startButtonPwarp)
 
@@ -497,9 +498,6 @@ class CameraWidget(QWidget):
             # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
             # Get the width of cameraFrame
             cameraFrameWidth = self.cameraFrame.size().width()
-
-            # Print the cameraFrame width
-            print(f"cameraFrame Width: {cameraFrameWidth}")
 
             # Set the buttons to the same width as cameraFrame
             self.doneButton1.setFixedWidth(cameraFrameWidth)
@@ -709,7 +707,6 @@ class CameraWidget(QWidget):
             self.object_points.append(self.objp)
 
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
-            # cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
             #cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
 
@@ -721,11 +718,6 @@ class CameraWidget(QWidget):
         
             # Print the number of corners found
             print("Number of corners found:", len(corners))
-
-            # Display the x and y coordinates of each corner _> move to perform_calibration to also get filename
-            #for i, corner in enumerate(corners):
-            #    x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
-            #    print(f"Found Corner {i+1}: x = {x}, y = {y}")
 
         return ret, corners, image
 
@@ -814,8 +806,6 @@ class CameraWidget(QWidget):
                         print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
 
                     # TODO Collect the Corners to be saved to corners.vnl
-                    
-                    # TODO Set boolean to calibration finished -> to prefent double / tripple run when moving to dewarp tab2
 
                     print("Calibration Succesfull")
 
@@ -903,8 +893,6 @@ class CameraWidget(QWidget):
                         print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
 
                     # TODO Collect the Corners to be saved to corners.vnl
-                        
-                    # TODO Set boolean to calibration finished -> to prefent double / tripple run when moving to dewarp tab2
 
                     print("Calibration Succesfull")
 
@@ -1048,52 +1036,10 @@ class CameraWidget(QWidget):
             return undistorted_frame
         else:
             print("No camera matrix or distortion coefficient detected, showing original frame")
-            return frame
-        
-    def undistort_fisheye_frame_simple(self, frame, camera_matrix, distortion_coefficients, balance=0.0):
-        """
-        Undistort a frame captured with a fisheye lens.
-        
-        :param frame: Input frame with distortion.
-        :param camera_matrix: Camera matrix (K).
-        :param distortion_coefficients: Distortion coefficients (D).
-        :param balance: Balance between the viewing area and undistortion effects, where 0 means full correction with possible cropping and 1 means minimal correction with all pixels retained in the output.
-        :return: Undistorted frame.
-        """
-        if camera_matrix is None or distortion_coefficients is None:
-            print("No camera matrix or distortion coefficient detected, showing original frame")
-            return frame
-
-        dim = frame.shape[:2][::-1]  # Original image dimensions
-        #print(f"Frame Dimension input (DIM1) = {dim}")
-
-        new_camera_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
-            camera_matrix, distortion_coefficients, dim, np.eye(3), balance=balance
-        )
-        map1, map2 = cv2.fisheye.initUndistortRectifyMap(
-            camera_matrix, distortion_coefficients, np.eye(3), new_camera_matrix, dim, cv2.CV_16SC2
-        )
-
-        # Issue: The borderMode=cv2.BORDER_CONSTANT parameter in cv2.remap fills the areas outside the remapping with a constant value (default is black), which, 
-        # if most of the image is out of bounds, results in a black image.
-
-        undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-
-        return undistorted_frame
-    
+            return frame   
         
     def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0.0, dim2=None, dim3=None):
-        """
-        Undistort a frame captured with a fisheye lens.
-        
-        :param frame: Input frame with distortion.
-        :param camera_matrix: Camera matrix (K).
-        :param distortion_coefficients: Distortion coefficients (D).
-        :param balance: Balance between the viewing area and undistortion effects, where 0 means full correction with possible cropping and 1 means minimal correction with all pixels retained in the output.
-        :param dim2: Desired image size after undistortion (width, height). Default is the size of the input image.
-        :param dim3: Size of the input image (width, height).
-        :return: Undistorted frame.
-        """
+
         if camera_matrix is None or distortion_coefficients is None:
             print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
@@ -1238,7 +1184,6 @@ class CameraWidget(QWidget):
 
                 undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
                 self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
-                #self.pixmap = self.imageToPixmap(undistorted_frame)
 
                 # Check if 'frame' is a valid NumPy array
                 if isinstance(frame, np.ndarray):
@@ -1247,23 +1192,10 @@ class CameraWidget(QWidget):
 
                     if len(frame.shape) == 3:  # Verify if valid frame shape
                         
-                        ## Add some checks to not recalculate everything all the time when TODO
-                        # We only need warper result once !
-                        # self.image_tuning_dewarp == True
-                        #if self.image_tuning_dewarp != True:
-                            # Also pass undistorted_frame as src and self.field_image as dst
-                        self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper  
-                            #self.warper_result = self.dewarp(undistorted_frame_rgb, self.field_image)  # return warper                       
+                        self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                     
 
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
-
-                        #######################################################
-                        # Add Rotate 90 degree clockwise and add grid 1m x 1m #
-                        #######################################################
-
-                        # Rotate 90 degrees clockwise
-                        #self.dewarped_frame = cv2.rotate(self.dewarped_frame, cv2.ROTATE_90_CLOCKWISE)
 
                         self.display_dewarped_frame(self.dewarped_frame)
 
@@ -1297,14 +1229,6 @@ class CameraWidget(QWidget):
                 # TODO
                 ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
 
-                #if ret:  # if frame captured successfully
-                    # frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally
-                    # original_inverted_frame = frame_inverted.copy()  # Store the original frame
-                    # undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                    # dewarped_frame = self.warper.warp(undistorted_frame.copy())  # Perform dewarping
-                    # self.display_dewarped_image(dewarped_frame)
-                #    pass  # temp
-
             elif self.network_dewarp == True:
                 # network_dewarp()
                 print("Starting network de-warp")  # -> update status
@@ -1329,8 +1253,6 @@ class CameraWidget(QWidget):
             QMessageBox.question(
                 self, "Warning!", f"No Image detected.\n\nPlease make sure an Image is loaded", QMessageBox.Ok
             )
-
-    #########################################################################################################
             
     def dewarp(self, img):
         # Add check if Tuning is started TODO
@@ -1424,6 +1346,9 @@ class CameraWidget(QWidget):
                 # Enable Start button again when all 4 points are collected
                 self.startButtonPwarp.setDisabled(False)
 
+                # Rename startButtonPwarp to <START Perspective-warp>
+                #self.startButtonPwarp.setText("START Perspective-warp")
+
                 # Stop mouse press event registration
                 #self.imageFrame.mousePressEvent = None
 
@@ -1432,6 +1357,8 @@ class CameraWidget(QWidget):
                     # Stop mouse press event registration
                     self.imageFrame.mousePressEvent = None
                     # self.imageFrame.keyPressEvent = None
+
+                    # Rename start
 
                 if self.image_tuning_dewarp == True:
 
@@ -1627,6 +1554,10 @@ class CameraWidget(QWidget):
                 self.ProcessImage.setPixmap(pixmap)
                 self.ProcessImage.setScaledContents(True)
 
+                #############################################
+                # TODO also draw on imageFrame while Tuning #
+                #############################################
+
                 # Cleanup
                 self.field_image_selected = None
 
@@ -1742,13 +1673,7 @@ class CameraWidget(QWidget):
                         self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                        
 
                         # Perform dewarping
-                        #self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy())
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
-
-                        #######################################################
-                        # Add Rotate 90 degree clockwise and add grid 1m x 1m #
-                        #######################################################
-                        #self.dewarped_frame = cv2.rotate(self.dewarped_frame, cv2.ROTATE_90_CLOCKWISE)
 
                         self.display_dewarped_frame(self.dewarped_frame)
 
@@ -1824,11 +1749,11 @@ class CameraWidget(QWidget):
         # Example usage:
         # mat = cv2.imread('image.jpg')
         filename = "mat.bin"
-        mat = self.dewarped_frame
 
-        #################################################
-        # Add function to create lookup table x,y,angle #
-        #################################################
+        ######################################################
+        # TODO Add function to create lookup table x,y,angle #
+        ######################################################
+        mat = self.dewarped_frame
 
         print(f"Saving to binary file {filename} and saving Mat image")
         return self.save_mat_binary(filename, mat)
@@ -1856,11 +1781,6 @@ class CameraWidget(QWidget):
     def load_mat_binary(self, filename, output):
         with open(filename, 'rb') as ifs:
             return self.read_mat_binary(ifs, output)
-
-    # Example usage:
-    # mat = cv2.imread('image.jpg')
-    # self.save_mat_binary('mat.bin', mat)
-    # loaded_mat = cv2.imread('mat.bin') 
 
     def close_application(self):
         QApplication.quit()

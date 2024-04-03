@@ -90,13 +90,19 @@ class Warper(object):
             src_img, self.M, (dst_img.shape[1], dst_img.shape[0])
         )
 
+        # Print the actual resulting image size after resizing or not
+        print(f"Result after warp: width={self.plan_view.shape[1]}, height={self.plan_view.shape[0]}")
+        rgb_view_image = cv2.cvtColor(self.plan_view, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(f'{self.config.tmp_data}/_after_warp.jpg', rgb_view_image)
+
         # Merge both src and dst image
         #self.merged = self.merge_views(src_img,dst_img, self.plan_view)
         self.merged = self.merge_views(dst_img, self.plan_view)
 
         # Print the actual resulting image size after resizing or not
         print(f"Result after merging: width={self.merged.shape[1]}, height={self.merged.shape[0]}")
-        cv2.imwrite(f'{self.config.tmp_data}/_after_merge.jpg', self.merged)
+        rgb_merged_image = cv2.cvtColor(self.merged, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(f'{self.config.tmp_data}/_after_merge.jpg', rgb_merged_image)
 
         # Rotate the resulting image by 45 degree
         #result_img = self.rotate_image(result_img, angle=-45)
