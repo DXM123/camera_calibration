@@ -1308,7 +1308,6 @@ class CameraWidget(QWidget):
                 self.field_image = self.draw_landmark(
                     self.field_image, self.config.field_coordinates_lm1, SoccerFieldColors.Red.value
                 )
-
                 # Convert to Pixman
                 self.pixmap = self.imageToPixmap(self.field_image)
                 pixmap = QPixmap(self.pixmap)
@@ -1568,12 +1567,8 @@ class CameraWidget(QWidget):
                 # Load the image
                 self.ProcessImage.setPixmap(pixmap)
                 self.ProcessImage.setScaledContents(True)
-
-                #############################################
-                # TODO also draw on imageFrame while Tuning #
-                #############################################
-
-                # Cleanup
+                    
+                # Cleanup - dont want to store previous landmarks (or dont overwrite :D)
                 self.field_image_selected = None
 
             elif event.key() == Qt.Key_2:
@@ -1689,6 +1684,19 @@ class CameraWidget(QWidget):
 
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
+
+                        #############################################
+                        # TODO also draw on imageFrame while Tuning #
+                        #############################################
+
+                        if self.image_tuning_dewarp == True:
+                            print("TEST....")
+                            # Draw selector on imageFrame
+                            self.dewarped_frame = self.draw_landmark_selected(
+                                self.dewarped_frame.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
+                            )
+
+                            #self.display_dewarped_frame(self.dewarped_frame)
 
                         self.display_dewarped_frame(self.dewarped_frame)
 
