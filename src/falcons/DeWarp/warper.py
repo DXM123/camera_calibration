@@ -91,7 +91,8 @@ class Warper(object):
         )
 
         # Merge both src and dst image
-        self.merged = self.merge_views(src_img,dst_img, self.plan_view)
+        #self.merged = self.merge_views(src_img,dst_img, self.plan_view)
+        self.merged = self.merge_views(dst_img, self.plan_view)
 
         # Print the actual resulting image size after resizing or not
         print(f"Result after merging: width={self.merged.shape[1]}, height={self.merged.shape[0]}")
@@ -104,14 +105,22 @@ class Warper(object):
         #self.draw_grid(result_img)
 
         return self.merged
-
-    def merge_views(self, src, dst, view):
-        for i in range(0,dst.shape[0]):
-            for j in range(0, dst.shape[1]):
-                if(view.item(i,j,0) == 0 and \
-                view.item(i,j,1) == 0 and \
-                view.item(i,j,2) == 0):
-                    view.itemset((i,j,0),dst.item(i,j,0))
-                    view.itemset((i,j,1),dst.item(i,j,1))
-                    view.itemset((i,j,2),dst.item(i,j,2))
-        return view
+    
+    def merge_views(self, dst, view, blend_factor=0.6):
+        # Ensure blend_factor is within the valid range
+        if not 0 <= blend_factor <= 1:
+            raise ValueError("Blend factor must be between 0 and 1.")
+        
+        # Ensure both frames have the same shape
+        if dst.shape != view.shape:
+            raise ValueError("The 'dst' and 'view' frames must have the same dimensions and number of channels.")
+        
+        # Convert frames to float for accurate computation and to avoid overflow
+        dst_float = dst.astype(np.float32)
+        view_float = view.astype(np.float32)
+        
+        # Calculate the weighted blend of the frames
+        blended_view = (dst_float * (1 - blend_factor)) + (view_float * blend_factor)
+        
+        # Convert blended frame back to original data type (e.g., uint8)
+        return blended_view.astype(dst.dtype)
