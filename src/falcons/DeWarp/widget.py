@@ -130,6 +130,8 @@ class CameraWidget(QWidget):
         # self.tabs.setFocusPolicy(Qt.ClickFocus)  # or Qt.StrongFocus
         self.tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
 
+        ## Prevent stealing focus -> policy! for imageFrame and CameraFrame while using Key + mouse events!! TODO
+
         self.tab1 = QWidget()
         self.tab2 = QWidget()
         self.tab2.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
@@ -1400,7 +1402,7 @@ class CameraWidget(QWidget):
             height=img.shape[0],
         )            
 
-        return self.warper
+        return self.warper 
 
     def stop_tuning(self):
         self.image_tuning_dewarp == False
@@ -1648,6 +1650,10 @@ class CameraWidget(QWidget):
                 # Cleanup
                 self.field_image_selected = None
 
+            # Add Zoom in: Resize the pixmap to 300% of its original size
+            # How to use self.dewarped_frame via ImageFrame? TODO
+            #elif event.key() == Qt.Key_Z:  # Check if 'Z' was pressed
+
             else:
                 super().keyPressEvent(event)  # Pass other key events to the base class
 
@@ -1675,6 +1681,7 @@ class CameraWidget(QWidget):
 
                 # Check if 'frame' is a valid NumPy array
                 if isinstance(frame, np.ndarray):
+                    
                     # Disable Load image Button when import succeeded and dewarp started
                     self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
 
@@ -1685,18 +1692,12 @@ class CameraWidget(QWidget):
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
 
-                        #############################################
-                        # TODO also draw on imageFrame while Tuning #
-                        #############################################
-
+                        # Add functionality while tuning
                         if self.image_tuning_dewarp == True:
-                            print("TEST....")
-                            # Draw selector on imageFrame
+                            # Draw selector on dewarped frame
                             self.dewarped_frame = self.draw_landmark_selected(
                                 self.dewarped_frame.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
                             )
-
-                            #self.display_dewarped_frame(self.dewarped_frame)
 
                         self.display_dewarped_frame(self.dewarped_frame)
 
@@ -1734,6 +1735,7 @@ class CameraWidget(QWidget):
         # Start de warp again for tuning
         self.start_pwarp()
 
+
     ####################### Binary file stuff WIP ###################
     
     def write_mat_binary(self, ofs, out_mat):
@@ -1752,16 +1754,19 @@ class CameraWidget(QWidget):
         return True
     
     def save_prep_mat_binary(self):
-        # Set Filename static for now TODO 
+        # Set Filename static for now TODO
         filename = "mat.bin"
 
-        ######################################################
-        # TODO Add function to create lookup table x,y,angle #
-        ######################################################
-        mat = self.dewarped_frame
+        # Get Shape of dewarped image
+        img_shape = self.dewarped_frame.shape[:2] # TODO needs to be cutout of ROI not whole frame
+
+        # Create the lookup table
+        lut = self.warper.create_lookup_table(img_shape)
 
         print(f"Saving to binary file {filename} and saving Mat image")
-        return self.save_mat_binary(filename, mat)
+
+        #return self.save_mat_binary(filename, mat)
+        return self.save_mat_binary(filename, lut)
 
     def save_mat_binary(self, filename, output):
         with open(filename, 'wb') as ofs:

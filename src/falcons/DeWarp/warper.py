@@ -32,6 +32,7 @@ class Warper(object):
         self.src_points = points
         self.landmark_points = landmark_points # Field Coordinate FCS
         self.dst = None
+        self.M = None
 
         #logging.info(
         print(
@@ -55,31 +56,6 @@ class Warper(object):
             self.interpolation = cv2.INTER_CUBIC
         else:
             self.interpolation = interpolation
-
-    # Now only Basic grid, needs to be more intelligent
-    def draw_grid(self, img):
-        #grid_size = 50  # Grid size in pixel
-        grid_size = self.config.ppm * 0.5
-        
-        # Draw vertical grid lines
-        for x in range(0, img.shape[1], grid_size):
-            cv2.line(img, (x, 0), (x, img.shape[0]), color=(SoccerFieldColors.White.value), thickness=1)
-        
-        # Draw horizontal grid lines
-        for y in range(0, img.shape[0], grid_size):
-            cv2.line(img, (0, y), (img.shape[1], y), color=(SoccerFieldColors.White.value), thickness=1)
-
-
-    def rotate_image(self, img, angle):
-        # Compute the center of the image
-        center = (img.shape[1] // 2, img.shape[0] // 2)
-
-        # Compute the rotation matrix
-        M = cv2.getRotationMatrix2D(center, angle, scale=1.0)
-
-        # Perform the rotation
-        rotated_img = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
-        return rotated_img
             
 
     def warp(self, src_img, dst_img):
@@ -96,19 +72,12 @@ class Warper(object):
         cv2.imwrite(f'{self.config.tmp_data}/_after_warp.jpg', rgb_view_image)
 
         # Merge both src and dst image
-        #self.merged = self.merge_views(src_img,dst_img, self.plan_view)
         self.merged = self.merge_views(dst_img, self.plan_view)
 
         # Print the actual resulting image size after resizing or not
         print(f"Result after merging: width={self.merged.shape[1]}, height={self.merged.shape[0]}")
         rgb_merged_image = cv2.cvtColor(self.merged, cv2.COLOR_BGR2RGB)
         cv2.imwrite(f'{self.config.tmp_data}/_after_merge.jpg', rgb_merged_image)
-
-        # Rotate the resulting image by 45 degree
-        #result_img = self.rotate_image(result_img, angle=-45)
-
-        # Draw grid on the resulting image
-        #self.draw_grid(result_img)
 
         return self.merged
     
@@ -131,3 +100,32 @@ class Warper(object):
         
         # Convert blended frame back to original data type (e.g., uint8)
         return blended_view.astype(dst.dtype)
+    
+    ################################ TEST LUT ##############################
+
+    def transform_point(self, x, y):
+        Hv = self.M
+        # Create the homogeneous coordinate of the point
+        point = np.array([x, y, 1])
+        
+        # Apply the transformation
+        transformed_point = np.dot(Hv, point)
+        
+        # Normalize if the last component is not 1
+        if transformed_point[2] != 0:
+            transformed_point /= transformed_point[2]
+        
+        #return transformed_point
+        return transformed_point[:2]
+
+
+    def create_lookup_table(self, img_shape):
+        height, width = img_shape
+        lut = np.zeros((height, width, 2), dtype=np.float32)
+
+        for y in range(height):
+            for x in range(width):
+                x_prime, y_prime = self.transform_point(x, y)
+                lut[y, x] = [x_prime, y_prime]
+
+        return lut
