@@ -56,6 +56,9 @@ def ensure_prompt_int(n, message):
 
 def main(args) -> None:
     """Perform the work."""
+    if 1: # temporary overrule, this is not yet used and too annoying to be forced to specify/fill right now
+        args.robot = 1
+        args.camera = 1
     # prompt the robot & camera if not given
     args.robot = ensure_prompt_int(args.robot, 'robot id')
     args.camera = ensure_prompt_int(args.camera, 'camera id')
