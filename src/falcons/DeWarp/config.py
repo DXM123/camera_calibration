@@ -18,6 +18,9 @@ class DeWarpConfig:
     square_size: float  # size of square on the Checkerboard in mm -> TODO: This is no longer required?
     cam_height: int # in cm to center of lens
 
+    # Root Mean Square (RMS) error threshold
+    rms_threshold : float # RMS threshold value 
+
     # Assuming the soccer field is 22 x 14 meters - old
     soccer_field_width: float
     soccer_field_length: float
