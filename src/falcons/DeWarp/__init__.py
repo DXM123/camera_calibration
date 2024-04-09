@@ -6,11 +6,11 @@ from PyQt5.QtWidgets import QApplication
 
 from .application import CamCalMain
 
-__version__ = '0.0.4'
+__version__ = '0.0.4' # TODO: this looks unused/strange, can we remove it?
 
 def run(args):
     app = QApplication([])
-    ex = CamCalMain()
+    ex = CamCalMain(args.input)
     # configure based on given arguments (typically coming from argparse)
     if not os.path.isdir(args.folder):
         raise Exception(f'calibration folder not found: {args.folder}')

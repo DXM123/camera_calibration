@@ -7,10 +7,11 @@ from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow, QMessageBox, QSta
 
 from .widget import CameraWidget
 from .config import get_config
+from .videoinput import VideoInput
 
 
 class CamCalMain(QMainWindow):
-    def __init__(self):
+    def __init__(self, video):
         super().__init__()
         self.title = "Falcons Calibration GUI - BETA"
         self.setWindowTitle(self.title)
@@ -23,6 +24,11 @@ class CamCalMain(QMainWindow):
         self.config.tmp_data = tempfile.TemporaryDirectory()
         #print('using tmp_data ' + str(self.config.tmp_data))
 
+        # Setup input video (or test) stream
+        if video is None:
+            video = 0 # default camera
+        self.video_input = VideoInput(video)
+
         # Initialize camera_matrix as None
         #self.camera_matrix = None
 
@@ -30,7 +36,7 @@ class CamCalMain(QMainWindow):
 
     def init_ui(self):
         # Create the central widget
-        self.camera_widget = CameraWidget(self)
+        self.camera_widget = CameraWidget(self, self.video_input)
         self.setCentralWidget(self.camera_widget)
 
         # Create the menu bar

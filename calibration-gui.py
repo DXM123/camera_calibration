@@ -33,7 +33,7 @@ def parse_args(args: list) -> argparse.Namespace:
     parser.add_argument('-f', '--folder', help='calibration data folder', type=str, default=default_data_folder())
     parser.add_argument('-r', '--robot', help='robot number (default prompt)', type=int)
     parser.add_argument('-c', '--camera', help='camera id (default prompt)', type=int, choices=[0,1,2,3])
-    parser.add_argument('-i', '--input', help='use provided file/stream, can either be an image or a video or camera', type=str, default='/dev/video1')
+    parser.add_argument('-i', '--input', help='use provided file/stream, can either be an image or a video or camera', type=str, default='/dev/video0')
     parser.add_argument('-j', '--json', help='load intermediate json file for partial calibration', type=str)
     parser.add_argument('-u', '--undistort', help='use opencv undistort instead of fisheye, intended for cameras with limited field of view', action='store_true')
     #parser.add_argument('-G', '--nogui', help='do not start the GUI, intended for regression tests', action='store_true') # maybe too much work
