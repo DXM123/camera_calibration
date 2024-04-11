@@ -1,22 +1,33 @@
 import json
 import os
 import sys
+import tempfile
 
 from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow, QMessageBox, QStatusBar
 
 from .widget import CameraWidget
 from .config import get_config
+from .videoinput import VideoInput
 
 
 class CamCalMain(QMainWindow):
-    def __init__(self):
+    def __init__(self, video):
         super().__init__()
         self.title = "Falcons Calibration GUI - BETA"
         self.setWindowTitle(self.title)
         self.setGeometry(0, 0, 800, 600)  # #self.setGeometry(self.left, self.top, self.width, self.height)
 
-        self.config = get_config()  # load config 
-        self.check_tmp_data_empty()  # check if tmp data folder is empty
+        self.config = get_config()  # load config
+        # setup tmp folder
+        # by definition, a tmp folder is temporary, no interaction with user needed
+        # the tmp folder gets automatically deleted when application closes
+        self.config.tmp_data = tempfile.TemporaryDirectory()
+        #print('using tmp_data ' + str(self.config.tmp_data))
+
+        # Setup input video (or test) stream
+        if video is None:
+            video = 0 # default camera
+        self.video_input = VideoInput(video)
 
         # Initialize camera_matrix as None
         #self.camera_matrix = None
@@ -25,7 +36,7 @@ class CamCalMain(QMainWindow):
 
     def init_ui(self):
         # Create the central widget
-        self.camera_widget = CameraWidget(self)
+        self.camera_widget = CameraWidget(self, self.video_input)
         self.setCentralWidget(self.camera_widget)
 
         # Create the menu bar
@@ -48,45 +59,6 @@ class CamCalMain(QMainWindow):
 
         # Connect the signal to the slot for updating the status bar
         self.camera_widget.update_status_signal.connect(self.update_status_bar)
-
-    
-    def check_tmp_data_empty(self):
-        # Check if the temporary data folder exists for temporarily processing captured images
-        if not os.path.exists(self.config.tmp_data):
-            try:
-                os.makedirs(self.config.tmp_data, exist_ok=True)
-                QMessageBox.information(self, "Info", "The temporary data folder was created successfully.", QMessageBox.Ok)
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to create the temporary data folder: {e}", QMessageBox.Ok)
-                sys.exit(1)  # Exits the application with an error status.
-        else:
-            # Check if there are existing images in the temp folder
-            existing_images = [f for f in os.listdir(self.config.tmp_data) if f.startswith("corner_") and f.endswith(".png")]
-
-            if existing_images:
-                # Ask the user if they want to delete existing images
-                reply = QMessageBox.question(
-                    self,
-                    "Existing Images",
-                    "There are existing images in the temporary data folder. Do you want to delete them?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No,
-                )
-
-                if reply == QMessageBox.Yes:
-                    # Delete existing images
-                    for image_file in existing_images:
-                        file_path = os.path.join(self.config.tmp_data, image_file)
-                        os.remove(file_path)
-
-                    # Inform the user about the deletion
-                    QMessageBox.information(self, "Deletion Complete", "Existing images have been deleted.", QMessageBox.Ok)
-
-                else:
-                    # If the user chooses not to delete, inform them and exit the method
-                    QMessageBox.information(self, "Calibration Canceled", "Calibration process canceled.", QMessageBox.Ok)
-
-                    sys.exit(0) # Exits the application without an error status, this is by choice.
 
 
     def load_calibration(self, filename):

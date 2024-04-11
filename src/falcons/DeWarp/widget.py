@@ -37,9 +37,10 @@ class CameraWidget(QWidget):
     # Add a signal for updating the status
     update_status_signal = pyqtSignal(str)
 
-    def __init__(self, parent: QMainWindow):
+    def __init__(self, parent: QMainWindow, video):
         super(QWidget, self).__init__(parent)
 
+        self.video = video
         self.config = get_config()
         self.min_cap = self.config.min_cap
         self.countdown_seconds = self.config.countdown_seconds # set to initial value
@@ -76,7 +77,7 @@ class CameraWidget(QWidget):
         self.image_tuning_dewarp = False  # Track if an image tuning is used for dewarping
 
         # Need the camera object in this Widget
-        self.cap = cv2.VideoCapture(0)  # webcam object
+        self.cap = video
         self.pixmap = None
 
         # Add cv_image Temp (distorted frame)
@@ -614,7 +615,8 @@ class CameraWidget(QWidget):
 
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
-        ret, frame = self.cap.read()  # read frame from webcam
+        frame = self.cap.get()
+        ret = True
 
         #print(f"test_calibration is set to: {self.test_started}")
 

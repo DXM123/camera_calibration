@@ -8,7 +8,7 @@ rms_threshold : 0.3 # 0.3 and below is considered very good calibration result
 
 # Config Default Variables - Enter their values according to your Checkerboard, normal 64 (8x8) -1 inner corners only
 no_of_columns: 7  # number of columns of your Checkerboard
-no_of_rows: 7  # number of rows of your Checkerboard
+no_of_rows: 6  # number of rows of your Checkerboard
 square_size: 27.0  # size of square on the Checkerboard in mm -> This is no longer required?
 cam_height: 75 # in cm to center of lens
 
