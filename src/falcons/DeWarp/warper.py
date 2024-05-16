@@ -14,9 +14,17 @@ class Warper(object):
         landmark_points: np.ndarray,
         width: Union[int, float] = 640,
         height: Union[int, float] = 480,
+        dist: np.ndarray = None,
+        matrix: np.ndarray = None,
         interpolation=None,
     ):
         self.config = get_config()
+        self.D = dist
+        self.K = matrix
+
+        # TEST
+        print(f"Camera Distortion Coefficients: {self.D}")
+        print(f"Camera Matrix: {self.K}")
 
         # TODO The types of width and height were inconsistent with their default
         # I fixed them now to be `Union[int, float]`. Do they have to be dynamic
@@ -31,8 +39,8 @@ class Warper(object):
         self.src_height = height
         self.src_points = points
         self.landmark_points = landmark_points # Field Coordinate FCS
-        self.dst = None
-        self.M = None
+        #self.dst = None
+        self.Hv = None
 
         #logging.info(
         print(
@@ -42,15 +50,14 @@ class Warper(object):
         )
 
         # Two way to calculate the Homography Hv (output is identical but one also produces mask (not used now))
-        self.M = cv2.getPerspectiveTransform(self.src_points.astype(np.float32), self.landmark_points.astype(np.float32))
-        #self.H, mask = cv2.findHomography(self.src_points.astype(np.float32), self.landmark_points.astype(np.float32), cv2.RANSAC,5.0)
+        self.Hv = cv2.getPerspectiveTransform(self.src_points.astype(np.float32), self.landmark_points.astype(np.float32))
+        #self.Hv, mask = cv2.findHomography(self.src_points.astype(np.float32), self.landmark_points.astype(np.float32), cv2.RANSAC,5.0)
 
-        if self.M is not None:
+        if self.Hv is not None:
             print("Homography Matrix (Hv):")
-            print(self.M)
-            #print(self.H)
+            print(self.Hv)
         else:
-            print("Homography matrix is not set.")
+            print("Homography Matrix (Hv) is not set.")
 
         if interpolation == None:
             self.interpolation = cv2.INTER_CUBIC
@@ -63,7 +70,7 @@ class Warper(object):
         print(f"Executing warpPerspective, src_width={src_img.shape[1]}, src_height={src_img.shape[0]}, dst_width={dst_img.shape[1]}, dst_height={dst_img.shape[0]}")
 
         self.plan_view = cv2.warpPerspective(
-            src_img, self.M, (dst_img.shape[1], dst_img.shape[0])
+            src_img, self.Hv, (dst_img.shape[1], dst_img.shape[0])
         )
 
         # Print the actual resulting image size after resizing or not
@@ -104,7 +111,7 @@ class Warper(object):
     ################################ TEST LUT ##############################
 
     def transform_point(self, x, y):
-        Hv = self.M
+        Hv = self.Hv
         # Create the homogeneous coordinate of the point
         point = np.array([x, y, 1])
         
@@ -118,14 +125,34 @@ class Warper(object):
         #return transformed_point
         return transformed_point[:2]
 
+    def undistort_point(self, x, y):
+        # Print the distortion coefficients and camera matrix
+        #print("Distortion Coefficients:", self.D)
+        #print("Camera Matrix:", self.K)
+
+
+        # Correct the point for lens distortion
+        distorted = np.array([[[x, y]]], dtype=np.float32)
+        #print("Distorted Point:", distorted)
+
+        undistorted = cv2.fisheye.undistortPoints(distorted, self.K, self.D, P=self.K)
+        #print("Undistorted Point:", undistorted[0,0])
+
+        return undistorted[0,0]
 
     def create_lookup_table(self, img_shape):
         height, width = img_shape
         lut = np.zeros((height, width, 2), dtype=np.float32)
 
+        # Add Camera Calibration
+        #lut = self.camera_correct(self, lut)
+
         for y in range(height):
             for x in range(width):
-                x_prime, y_prime = self.transform_point(x, y)
+                # Apply lens correction
+                x_corr, y_corr = self.undistort_point(x, y)
+                # Transform the corrected coordinates
+                x_prime, y_prime = self.transform_point(x_corr, y_corr)
                 lut[y, x] = [x_prime, y_prime]
 
         return lut

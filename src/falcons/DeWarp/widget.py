@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import time
 
 import cv2
 import numpy as np
@@ -32,7 +33,10 @@ from .config import get_config
 from .soccer_field import SoccerField
 from .warper import Warper
 
+#from .pylonInput import cameraCapture
+from .pylonThread import PylonThread
 
+# MainWidget
 class CameraWidget(QWidget):
     # Add a signal for updating the status
     update_status_signal = pyqtSignal(str)
@@ -72,7 +76,7 @@ class CameraWidget(QWidget):
         self.cal_imported = False  # Track if imported calibration is used
         self.cal_saved = False # Track if calibration is saved to file
         self.image_dewarp = False  # Track if an image is used for dewarping
-        self.usb_dewarp = False  # Track if an USB camera is used for dewarping
+        self.video_dewarp = False  # Track if an USB camera is used for dewarping
         self.network_dewarp = False  # Track if an network stream is used for dewarping
         self.image_tuning_dewarp = False  # Track if an image tuning is used for dewarping
 
@@ -136,7 +140,7 @@ class CameraWidget(QWidget):
         self.tab1 = QWidget()
         self.tab2 = QWidget()
         self.tab2.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
-        self.tabs.resize(300, 200)
+        #self.tabs.resize(300, 200)
 
         # Add tabs
         self.tabs.addTab(self.tab1, "Camera Calibration")
@@ -183,7 +187,7 @@ class CameraWidget(QWidget):
         self.optionsFrame.layout.setAlignment(Qt.AlignTop)  # Align the layout to the top
 
         # Set fixed width for optionsFrame
-        self.optionsFrame.setFixedWidth(500)
+        self.optionsFrame.setFixedWidth(700) # 500 with 3 options
 
         # Add options widgets to optionsFrame:
         input_label = QLabel("Input Options:")
@@ -193,26 +197,31 @@ class CameraWidget(QWidget):
         # Add radio buttons for selecting options
         self.input_layout = QHBoxLayout()
 
-        self.input_camera = QRadioButton("CAM")
+        self.input_camera = QRadioButton("Video") # Can be Camera or Video now!
         self.input_network = QRadioButton("Network")
-        self.input_images = QRadioButton("Images") 
-
+        self.input_images = QRadioButton("Images")
+        self.input_pylon = QRadioButton("Pylon")
+        
         # Set "USB" as the default option
         self.input_camera.setChecked(True)
 
-        # Connect the toggled signal of radio buttons to a slot function, not for images
+        # Connect the toggled signal of radio buttons to a slot function
         self.input_images.toggled.connect(self.update_capture_button_state)
-        self.input_network.toggled.connect(self.update_capture_button_state)
+        self.input_network.toggled.connect(self.update_capture_button_state) # TMP disable not implemented yet
+        self.input_camera.toggled.connect(self.update_capture_button_state)
+        self.input_pylon.toggled.connect(self.update_capture_button_state)
 
         # Create a button group to make sure only one option is selected at a time
         self.input_group = QButtonGroup()
         self.input_group.addButton(self.input_camera)
         self.input_group.addButton(self.input_network)
         self.input_group.addButton(self.input_images)
+        self.input_group.addButton(self.input_pylon)
 
         self.input_layout.addWidget(self.input_camera)
         self.input_layout.addWidget(self.input_network)
         self.input_layout.addWidget(self.input_images)
+        self.input_layout.addWidget(self.input_pylon)
 
         self.optionsFrame.layout.addLayout(self.input_layout)
 
@@ -319,7 +328,7 @@ class CameraWidget(QWidget):
         # self.ProcessFrame.layout.addStretch(1)
 
         # Set fixed width for processFrame
-        self.ProcessFrame.setFixedWidth(500)
+        self.ProcessFrame.setFixedWidth(700) # 500 for 3 options
 
         # Add options widgets to optionsFrame:
         process_label = QLabel("Process Options:")
@@ -329,26 +338,32 @@ class CameraWidget(QWidget):
         # Add radio buttons for selecting options
         self.radio_layout = QHBoxLayout()
 
-        self.radio_usb = QRadioButton("USB")
+        #self.radio_usb = QRadioButton("USB")
+        self.radio_video = QRadioButton("Video")
         self.radio_network = QRadioButton("Network")
-        self.radio_image = QRadioButton("Image")
+        self.radio_image = QRadioButton("Images")
+        self.radio_pylon = QRadioButton("Pylon")
 
         # Set "USB" as the default option
         self.radio_image.setChecked(True)
 
         # Connect the toggled signal of radio buttons to a slot function
-        self.radio_usb.toggled.connect(self.update_load_button_state)
+        self.radio_video.toggled.connect(self.update_load_button_state)
         self.radio_network.toggled.connect(self.update_load_button_state)
+        self.radio_image.toggled.connect(self.update_load_button_state)
+        self.radio_pylon.toggled.connect(self.update_load_button_state)
 
         # Create a button group to make sure only one option is selected at a time
         self.button_group = QButtonGroup()
-        self.button_group.addButton(self.radio_usb)
+        self.button_group.addButton(self.radio_video)
         self.button_group.addButton(self.radio_network)
         self.button_group.addButton(self.radio_image)
+        self.button_group.addButton(self.radio_pylon)
 
-        self.radio_layout.addWidget(self.radio_usb)
+        self.radio_layout.addWidget(self.radio_video)
         self.radio_layout.addWidget(self.radio_network)
         self.radio_layout.addWidget(self.radio_image)
+        self.radio_layout.addWidget(self.radio_pylon)
 
         self.ProcessFrame.layout.addLayout(self.radio_layout)
 
@@ -436,10 +451,35 @@ class CameraWidget(QWidget):
         elif self.input_camera.isChecked():
             self.captureButton1.setEnabled(True)
             self.captureButton1.setText("Start Capture")
+            self.captureButton1.clicked.connect(self.start_capture)
+        elif self.input_pylon.isChecked():
+            self.captureButton1.setEnabled(True)
+            self.captureButton1.setText("Initialize Pylon")
+            self.captureButton1.clicked.connect(self.pylon_start)
+            #self.captureButton1.clicked.connect(self.start_capture) 
+        elif self.input_network.isChecked():
+            self.captureButton1.setEnabled(True)
+            self.captureButton1.setText("Start Capture")
             self.captureButton1.clicked.connect(self.start_capture) 
         else:
             self.captureButton1.setEnabled(False)
             
+    def pylon_start(self):
+        #print ("Initialize Pylon Capture")
+        # Placeholder to select cam or set settings first
+        self.captureButton1.setText("Start Capture")
+        self.captureButton1.clicked.connect(self.start_capture)
+
+        # Start Pylon Thread
+        self.thread = PylonThread()
+        # Connect the image signal to the slot
+        self.thread.imageSignal.connect(self.displayPylonImage) # --> Send to process function first and then update_image
+        #self.thread.imageSignal.connect(self.process_frame_for_corners) # Get the opencv compatible img and process
+        
+        # Start the thread
+        self.thread.start()
+    
+    
     # Browse input folder for images 
     def select_directory_and_load_images(self):
         options = QFileDialog.Options()
@@ -575,7 +615,8 @@ class CameraWidget(QWidget):
             #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
             #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-            # prep for fisheye toggle
+            # prep for fisheye toggle> TODO Toggle now assume fisheye for images
+            #if self.input_images.isChecked():
             if self.input_images.isChecked():
                 undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
             else:
@@ -615,13 +656,33 @@ class CameraWidget(QWidget):
 
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
-        frame = self.cap.get()
-        ret = True
+        #frame = self.cap.get()
+        #ret = True
+
+        # - self.cap.read() instead of .get()       #
+        #############################################
+
+        # This method will be called at regular intervals by the timer
+        # ret, frame = self.cap.read()
+        if self.input_camera.isChecked():
+            frame = self.cap.get()
+            ret = True # Why set this static when video is added !
+
+        if self.input_pylon.isChecked():
+            ret = False
+            # Get frame from Thread , for now set ret to False
 
         #print(f"test_calibration is set to: {self.test_started}")
 
         if ret:  # if frame captured successfully
-            frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally --> Is this needed TODO
+            #frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally --> Is this needed TODO
+
+            # TODO Only flip for internal CAM and not input video !!
+            if self.input_camera.isChecked() and not self.test_started:
+                frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally --> Is this needed TODO -> Only for Camera , not for Video !!
+            else:
+                frame_inverted = frame
+
             original_inverted_frame = frame_inverted.copy()  # Store the original frame
 
             # TODO update inverted_frame to corrected frame
@@ -636,14 +697,16 @@ class CameraWidget(QWidget):
                 #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
                 #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-                if self.input_images.isChecked():
+                # Camera input not fisheye TODO create fisheye toggle
+                if not self.input_camera.isChecked():
                     undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                     
                 frame_inverted = undistorted_frame # cheesey replace
 
-            if self.capture_started:
+            #if self.capture_started:
+            if self.capture_started and not (self.test_started or self.cal_imported):
                 # Call detectCorners function
                 ret_corners, corners, frame_with_corners = self.detectCorners(
                     frame_inverted, self.no_of_columns, self.no_of_rows
@@ -665,10 +728,54 @@ class CameraWidget(QWidget):
                     # Display the original frame
                     self.pixmap = self.CameraToPixmap(frame_inverted)
                     self.cameraFrame.setPixmap(self.pixmap)
+            else:
+                # Display the original frame
+                self.pixmap = self.CameraToPixmap(frame_inverted)
+                self.cameraFrame.setPixmap(self.pixmap)
+
+            # TODO Change frame_inverted name!!
+
 
             # Ensure the image does not scales with the label -> issue with aspect ratio TODO
             self.cameraFrame.setScaledContents(False)
             self.update()
+    
+    ############ NEW TODO #####################
+
+    def process_frame_for_corners(self, frame):
+        # Optionally to try downscaling image to run findchessboardcorners and use output corners as input on noral size image for FindCornerSubpix
+        detection_start_time = time.time()
+        ret_corners, corners, frame_with_corners = self.detectCorners(
+            frame, self.no_of_columns, self.no_of_rows
+        )
+        print("Corner detection took: {:.2f} seconds".format(time.time() - detection_start_time))
+
+        if ret_corners and self.countdown_seconds > 0:
+            # Optionally emit status update signal
+            # self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
+            print("Capturing in", self.countdown_seconds, "seconds...")
+        elif ret_corners and self.countdown_seconds == 0:
+            self.save_screenshot(frame)  # Save the original frame
+            self.countdown_seconds = self.config.countdown_seconds  # Reset the countdown after saving
+
+        if ret_corners:
+            # Display the frame with corners
+            self.pixmap = self.CameraToPixmap(frame_with_corners)
+            self.cameraFrame.setPixmap(self.pixmap)
+            # Optional: Resize if needed
+            # self.cameraFrame.resize(self.pixmap.size())
+        else:
+            # Display the original frame
+            self.pixmap = self.CameraToPixmap(frame)
+            self.cameraFrame.setPixmap(self.pixmap)
+            # Optional: Resize if needed
+            # self.cameraFrame.resize(self.pixmap.size())
+
+    def displayPylonImage(self, img):
+            self.pixmap = self.CameraToPixmap(img)
+            self.cameraFrame.setPixmap(self.pixmap)
+
+    ######################################
 
     def update_countdown(self):
         if self.countdown_seconds > 0:
@@ -684,17 +791,28 @@ class CameraWidget(QWidget):
         # Stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
         # In this case the maximum number of iterations is set to 30 and epsilon = 0.1
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
-        #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001) # We want a high accuracy, but does it really help?
+
+        # cv2.CALIB_CB_FILTER_QUADS really helps
+        flags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE + cv2.CALIB_CB_FILTER_QUADS
 
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+        # Apply Gaussian blur
+        kernel_size = (5, 5)  # Kernel size can be (3,3), (5,5), (7,7) etc. depending on the level of blurring needed.
+        sigma = 1  # Standard deviation of the kernel. Increasing this value leads to more blurring.
+
+        # Adding blurr reduces processing when no corners found from 5s to 2s or less
+        blurred = cv2.GaussianBlur(gray, kernel_size, sigma)
+
         # Find the chess board corners. If desired number of corners are found in the image then ret = true
+        #findchessboard_start_time = time.time()
         ret, corners = cv2.findChessboardCorners(
-            gray,
+            blurred,
             (columns, rows),
-            cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FILTER_QUADS + cv2.CALIB_CB_NORMALIZE_IMAGE,
-        )  # Current Falcons CamCal option
+            flags,
+        )
+        #print("Find chessboard on image took: {:.2f} seconds".format(time.time() - findchessboard_start_time))
 
         if ret:
             print("Corners detected successfully!")
@@ -702,19 +820,23 @@ class CameraWidget(QWidget):
             self.object_points.append(self.objp)
 
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
-            cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
-            #cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
+            corners_refined = cv2.cornerSubPix(blurred, corners, (3, 3), (-1, -1), criteria)
+            #corners_refined = cv2.cornerSubPix(blurred, corners, (5, 5), (-1, -1), criteria)
+            #corners_refined = cv2.cornerSubPix(blurred, corners, (11, 11), (-1, -1), criteria)
 
             ## Now Store Corners Detected
             self.image_points.append(corners)
 
             # draw and display the chessboard corners
-            cv2.drawChessboardCorners(image, (columns, rows), corners, ret)
+            cv2.drawChessboardCorners(image, (columns, rows), corners_refined, ret)
         
             # Print the number of corners found
-            print("Number of corners found:", len(corners))
+            print("Number of corners found:", len(corners_refined))
+
+            corners = corners_refined
 
         return ret, corners, image
+
 
     def save_screenshot(self, frame):
         # Ensure that the output directory exists
@@ -805,7 +927,7 @@ class CameraWidget(QWidget):
 
         # check with min_cap for minimum images needed for calibration (Default should be 10) (3 for now)
         if len(self.object_points) >= self.config.min_cap:
-            print(f"Found {self.object_points} images with corners detected")
+            print(f"Found {len(self.object_points)} images with corners detected")
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -818,6 +940,13 @@ class CameraWidget(QWidget):
                 # Display the calibration results
                 self.outputWindow.setText(f"Camera matrix:{camera_matrix}")
                 print(f"Camera matrix found:{camera_matrix}")
+
+                # Print the RMS re-projection error
+                #print(f"RMS re-projection error: {ret}")
+
+                # Check if the Root Mean Square (RMS) error is below threshold (Stored in ret)
+                # Hard to get RMS below 1.0 for normal calibration               
+                #self.evaluate_calibration(ret)
 
                 # Assign camera_matrix to the instance variable
                 self.camera_matrix = camera_matrix
@@ -981,7 +1110,7 @@ class CameraWidget(QWidget):
             return "Very Poor"
 
     def evaluate_calibration(self, rms):
-        # Check RMS and categorize calibration quality
+        # Check RMS and categorize calibration quality (Work for Fisheye, but diff valies for non fisheye)
         quality = self.verify_rms(rms)
 
         # Print message or raise error based on RMS quality
@@ -991,7 +1120,9 @@ class CameraWidget(QWidget):
             reset = "\033[0m"  # Resets the style to default
             print(f"{green_bold}RMS is {rms}, indicating {quality} calibration quality.{reset}")
         else:
+            self.timer.stop()
             raise ValueError(f"RMS is {rms}, indicating Poor calibration quality. Recalibration required.")
+            # Add Retry option
 
     def generate_object_points(self, columns, rows, square_size):
         objp = np.zeros((1, columns * rows, 3), np.float32)
@@ -1167,7 +1298,7 @@ class CameraWidget(QWidget):
 
     # Slot function to enable or disable the "Load Image" button based on the radio button state
     def update_load_button_state(self):
-        if self.radio_usb.isChecked() or self.radio_network.isChecked():
+        if self.radio_video.isChecked() or self.radio_network.isChecked():
             self.loadImage.setEnabled(False)
         else:
             self.loadImage.setEnabled(True)
@@ -1246,15 +1377,17 @@ class CameraWidget(QWidget):
                 else:
                     print("Invalid frame format: Not a NumPy array")
 
-            elif self.usb_dewarp == True:
-                # usb_dewarp()
-                print("Starting usb camera de-warp")  # -> update status
+            elif self.video_dewarp == True:
+                # video_dewarp()
+                print("Starting Video de-warp")  # -> update status
 
                 # Start the camera again
                 self.timer.start(100)  # Assuming 100 milliseconds per frame update
 
                 # TODO
-                ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
+                #ret, frame = self.cap.read()  # read frame from webcam   -> use update_camera function
+                frame = self.cap.get()
+                ret = True
 
             elif self.network_dewarp == True:
                 # network_dewarp()
@@ -1396,12 +1529,20 @@ class CameraWidget(QWidget):
             f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}"
         )
 
+        # Test is value is provided
+        #print(f"Pre-Warper Camera Distortion Coefficients: {self.camera_dist_coeff}")
+        #print(f"Pre-Warper Camera Matrix: {self.camera_matrix}")
+
         # TODO Can we fix this sorting without hard-coding to the config?
         self.warper = Warper(
             points=np.array([self.points[0], self.points[1], self.points[2], self.points[3]]),
             landmark_points=self.landmark_points,
             width=img.shape[1],
             height=img.shape[0],
+            dist=self.camera_dist_coeff,
+            matrix=self.camera_matrix,
+            camera_dist_coeff=self.camera_dist_coeff,
+            camera_matrix=self.camera_matrix,
         )            
 
         return self.warper 
@@ -1792,4 +1933,5 @@ class CameraWidget(QWidget):
             return self.read_mat_binary(ifs, output)
 
     def close_application(self):
+        self.thread.stop() # Should this be here and does it work?
         QApplication.quit()

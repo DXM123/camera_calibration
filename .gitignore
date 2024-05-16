@@ -164,6 +164,7 @@ output/
 dump/
 mrcal/
 test/prev_tool_gui/
+test/pylon
 tmp_data/
 video/
 
