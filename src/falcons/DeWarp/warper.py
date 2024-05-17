@@ -14,12 +14,12 @@ class Warper(object):
         landmark_points: np.ndarray,
         width: Union[int, float] = 640,
         height: Union[int, float] = 480,
-        dist: np.ndarray = None,
         matrix: np.ndarray = None,
+        dist_coeff: np.ndarray = None,
         interpolation=None,
     ):
         self.config = get_config()
-        self.D = dist
+        self.D = dist_coeff
         self.K = matrix
 
         # TEST

@@ -78,6 +78,7 @@ class CameraWidget(QWidget):
         self.image_dewarp = False  # Track if an image is used for dewarping
         self.video_dewarp = False  # Track if an USB camera is used for dewarping
         self.network_dewarp = False  # Track if an network stream is used for dewarping
+        self.pylon_dewarp = False  # Track if an pylon stream is used for dewarping
         self.image_tuning_dewarp = False  # Track if an image tuning is used for dewarping
 
         # Need the camera object in this Widget
@@ -206,8 +207,8 @@ class CameraWidget(QWidget):
         self.input_camera.setChecked(True)
 
         # Connect the toggled signal of radio buttons to a slot function
-        self.input_images.toggled.connect(self.update_capture_button_state)
-        self.input_network.toggled.connect(self.update_capture_button_state) # TMP disable not implemented yet
+        self.input_images.toggled.connect(self.update_capture_button_state) 
+        self.input_network.toggled.connect(self.update_capture_button_state) # TMP - not implemented yet
         self.input_camera.toggled.connect(self.update_capture_button_state)
         self.input_pylon.toggled.connect(self.update_capture_button_state)
 
@@ -382,7 +383,7 @@ class CameraWidget(QWidget):
         aspect_ratio = self.config.soccer_field_width / self.config.soccer_field_length
 
         # Set the height of the QLabel to fixed pixels
-        label_height = 300
+        label_height = 400 # was 300 for 3 options
 
         # Draw and display soccer field in the ProcessFrame
         field_drawer = SoccerField(self.config)
@@ -460,14 +461,13 @@ class CameraWidget(QWidget):
         elif self.input_network.isChecked():
             self.captureButton1.setEnabled(True)
             self.captureButton1.setText("Start Capture")
-            self.captureButton1.clicked.connect(self.start_capture) 
+            self.captureButton1.clicked.connect(self.start_capture) # Placeholder
         else:
             self.captureButton1.setEnabled(False)
             
     def pylon_start(self):
         #print ("Initialize Pylon Capture")
         # Placeholder to select cam or set settings first
-        self.captureButton1.setText("Start Capture")
         self.captureButton1.clicked.connect(self.start_capture)
 
         # Start Pylon Thread
@@ -478,7 +478,13 @@ class CameraWidget(QWidget):
         
         # Start the thread
         self.thread.start()
-    
+
+        self.captureButton1.setText("Pylon Camera Started")
+        
+        # Disable Load Images button
+        self.captureButton1.setEnabled(False)
+
+        # TODO Add option to Stop thread
     
     # Browse input folder for images 
     def select_directory_and_load_images(self):
@@ -507,43 +513,14 @@ class CameraWidget(QWidget):
         if self.current_image_index < len(self.image_files):
             # Print which image is being loaded and its index
             print(f"Loading image {self.current_image_index + 1}/{len(self.image_files)}: {self.image_files[self.current_image_index]}")
-            self.load_image_local(self.image_files[self.current_image_index])
+
+            self.cv_image = cv2.imread(self.image_files[self.current_image_index])
+            self.update_image_feed(self.cv_image)
+
         else:
             print("No more images in the directory.")
 
             # GOTO NEXT -> Press DONE
-
-    # Image loading for tab1
-    def load_image_local(self, file_name):
-        if file_name:
-            # Image loading and processing logic here
-            self.cv_image = cv2.imread(file_name)
-            self.cv_image_rgb = cv2.cvtColor(self.cv_image, cv2.COLOR_BGR2RGB)  # Corrected color conversion
-
-            # Covert to Pixmap and other operations...
-            pixmap = self.imageToPixmap(self.cv_image_rgb)
-
-            # Set loaded image in CameraFrame
-            self.cameraFrame.setPixmap(pixmap)
-            self.cameraFrame.setScaledContents(False) # Never Scale
-
-            # Adjust cameraFrame size to match the pixmap size - Set Fixed Size like imageFrame
-            self.cameraFrame.setFixedSize(pixmap.size())
-
-            # Allign Buttons to the same size self.startButtonPwarp & self.loadImage
-            # Get the width of cameraFrame
-            cameraFrameWidth = self.cameraFrame.size().width()
-
-            # Set the buttons to the same width as cameraFrame
-            self.doneButton1.setFixedWidth(cameraFrameWidth)
-            self.captureButton1.setFixedWidth(cameraFrameWidth)
-
-            if self.cameraFrame.pixmap() is not None:
-                self.processoutputWindow.setText("Image loaded")
-                self.update_image_feed(self.cv_image) 
-
-            else:
-                self.processoutputWindow.setText("Problem displaying image")
 
     # This is working when using general name 
     def keyPressEvent(self, event):
@@ -587,6 +564,7 @@ class CameraWidget(QWidget):
         qformat = QImage.Format_RGB888
         img = QImage(image, image.shape[1], image.shape[0], image.strides[0], qformat)
         #img = img.rgbSwapped()  # BGR > RGB # needed for camera feed
+        #Resize here??
 
         return QPixmap.fromImage(img)
 
@@ -612,19 +590,46 @@ class CameraWidget(QWidget):
             print("Calibartion test started or calibration imported")
 
             # Debug print for camera matrix and distortion coefficients
-            #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
-            #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
+            print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
+            print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
+
+            #######################################
+
+            # Generate a timestamp for the screenshot filename
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+            filename = f"{self.config.tmp_data}/b4-cal-test_{timestamp}.png"
+
+            # Save the frame as an image
+            cv2.imwrite(filename, image)
+
+            #################### Goes black below ######################
 
             # prep for fisheye toggle> TODO Toggle now assume fisheye for images
-            #if self.input_images.isChecked():
             if self.input_images.isChecked():
                 undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
             else:
                 undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
 
-            undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
-            self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
-            
+            # Generate a timestamp for the screenshot filename
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+            filename = f"{self.config.tmp_data}/After-cal-test_{timestamp}.png"
+
+            # Save the frame as an image
+            cv2.imwrite(filename, undistorted_frame)
+
+            undistorted_frame = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+            self.pixmap = self.imageToPixmap(undistorted_frame)
+
+            ##########################################
+
+            #self.cameraFrame.setFixedSize(self.pixmap.size())
+            # Get the width of cameraFrame
+            #cameraFrameWidth = self.cameraFrame.size().width()
+
+            # Set the buttons to the same width as cameraFrame
+            #self.doneButton1.setFixedWidth(cameraFrameWidth)
+            #self.captureButton1.setFixedWidth(cameraFrameWidth)
+
             # Use cameraFrame for tab1 and imageFrame for tab2
             if self.tabs.currentIndex() == 0:  # tab1 is at index 0
                 self.cameraFrame.setPixmap(self.pixmap)
@@ -820,12 +825,13 @@ class CameraWidget(QWidget):
             self.object_points.append(self.objp)
 
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
-            corners_refined = cv2.cornerSubPix(blurred, corners, (3, 3), (-1, -1), criteria)
+            corners_refined = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results
             #corners_refined = cv2.cornerSubPix(blurred, corners, (5, 5), (-1, -1), criteria)
             #corners_refined = cv2.cornerSubPix(blurred, corners, (11, 11), (-1, -1), criteria)
 
             ## Now Store Corners Detected
-            self.image_points.append(corners)
+            #self.image_points.append(corners)
+            self.image_points.append(corners_refined)
 
             # draw and display the chessboard corners
             cv2.drawChessboardCorners(image, (columns, rows), corners_refined, ret)
@@ -1129,6 +1135,8 @@ class CameraWidget(QWidget):
         objp[0, :, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2) * square_size
         return objp
 
+    #######################################################################
+
     def test_calibration(self):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
@@ -1178,64 +1186,25 @@ class CameraWidget(QWidget):
 
             return frame
         
-    # When lens field of view is above 160 degree we need fisheye undistort function for opencv
-    def undistort_fisheye_frame_prev(self, frame, camera_matrix, distortion_coefficients):
+    # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
+    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix and distortion_coefficients are available
         if camera_matrix is not None and distortion_coefficients is not None:
 
             # Store Frame Dimension
             DIM = frame.shape[:2][::-1]  # Original image dimensions
-            #print(f"Frame Dimension (DIM) = {DIM}")
+            print(f"Frame Dimension (DIM) = {DIM}")
+
+            #new_camera_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(camera_matrix, distortion_coefficients, DIM, np.eye(3), balance=1)
 
             # Undistort and remap frame
-            map1, map2 = cv2.fisheye.initUndistortRectifyMap(camera_matrix, distortion_coefficients, np.eye(3), camera_matrix, DIM, cv2.CV_16SC2)
+            map1, map2 = cv2.fisheye.initUndistortRectifyMap(camera_matrix, distortion_coefficients, np.eye(3), camera_matrix, DIM, cv2.CV_32FC1) # cv2.CV_16SC2
             undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
             return undistorted_frame
         else:
             print("No camera matrix or distortion coefficient detected, showing original frame")
-            return frame   
-        
-    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0.0, dim2=None, dim3=None):
-
-        if camera_matrix is None or distortion_coefficients is None:
-            print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
-        
-        # DIM and dim1 ae always the same so why bother with scaling??
-        _img_shape = frame.shape[:2]
-        DIM=_img_shape[::-1] # should be original image shape used for calibration
-        #print(f"Frame Dimension (DIM) = {DIM}")
-
-        dim1 = frame.shape[:2][::-1]  # Original image dimensions of target images , but not the case here
-        #print(f"Frame Dimension input (DIM1) = {dim1}")
-
-        if not dim2:
-            dim2 = dim1 # Target dimension for the new camera matrix optimization
-        if not dim3:
-            dim3 = dim1 # Output image dimension for undistortion map
-
-        # Scale fx and cx with the width ratio, and fy and cy with the height ratio
-        width_ratio = dim1[0] / DIM[0]
-        height_ratio = dim1[1] / DIM[1]
-
-        scaled_K = camera_matrix.copy()
-        scaled_K[0, 0] *= width_ratio  # Scale fx
-        scaled_K[1, 1] *= height_ratio  # Scale fy
-        scaled_K[0, 2] *= width_ratio  # Scale cx
-        scaled_K[1, 2] *= height_ratio  # Scale cy
-        scaled_K[2, 2] = 1.0  # Keep the scale factor for homogeneous coordinates as 1
-
-        # Now, estimate the new camera matrix optimized for dim2 dimensions
-        new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
-
-        # Initialize the undistort rectify map for the dimensions of the output image (dim3)
-        map1, map2 = cv2.fisheye.initUndistortRectifyMap(scaled_K, distortion_coefficients, np.eye(3), new_K, dim3, cv2.CV_16SC2)
-
-        # Finally, remap the image using the undistortion map for the corrected image
-        undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-
-        return undistorted_frame
 
 
     def save_calibration(self):
@@ -1524,9 +1493,9 @@ class CameraWidget(QWidget):
             QApplication.processEvents()
 
         print(
-            f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}"
-            f"Check imageFrame| W: {self.imageFrame.width()}, H: {self.imageFrame.height()}"
-            f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}"
+            f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}\n"
+            f"Check imageFrame| W: {self.imageFrame.width()}, H: {self.imageFrame.height()}\n"
+            f"Check image Shape| W: {img.shape[0]}, H: {img.shape[1]}\n"
         )
 
         # Test is value is provided
@@ -1539,10 +1508,8 @@ class CameraWidget(QWidget):
             landmark_points=self.landmark_points,
             width=img.shape[1],
             height=img.shape[0],
-            dist=self.camera_dist_coeff,
             matrix=self.camera_matrix,
-            camera_dist_coeff=self.camera_dist_coeff,
-            camera_matrix=self.camera_matrix,
+            dist_coeff=self.camera_dist_coeff,
         )            
 
         return self.warper 
@@ -1933,5 +1900,4 @@ class CameraWidget(QWidget):
             return self.read_mat_binary(ifs, output)
 
     def close_application(self):
-        self.thread.stop() # Should this be here and does it work?
         QApplication.quit()
