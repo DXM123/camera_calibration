@@ -106,6 +106,9 @@ class CameraWidget(QWidget):
         # Initialize camera_distortion coefficients as None
         self.camera_dist_coeff = None
 
+        # Init Calibartion Frame Dimension as None
+        self.calibrate_DIM = None
+
         # Define basic line thickness to draw soccer field
         self.line_thickness = 2
 
@@ -481,7 +484,7 @@ class CameraWidget(QWidget):
 
         self.captureButton1.setText("Pylon Camera Started")
         
-        # Disable Load Images button
+        # Disable button
         self.captureButton1.setEnabled(False)
 
         # TODO Add option to Stop thread
@@ -795,7 +798,7 @@ class CameraWidget(QWidget):
     def detectCorners(self, image, columns, rows):
         # Stop the iteration when specified accuracy, epsilon, is reached or specified number of iterations are completed. 
         # In this case the maximum number of iterations is set to 30 and epsilon = 0.1
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
         # cv2.CALIB_CB_FILTER_QUADS really helps
         flags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE + cv2.CALIB_CB_FILTER_QUADS
@@ -804,7 +807,7 @@ class CameraWidget(QWidget):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Apply Gaussian blur
-        kernel_size = (5, 5)  # Kernel size can be (3,3), (5,5), (7,7) etc. depending on the level of blurring needed.
+        kernel_size = (3, 3)  # Kernel size can be (3,3), (5,5), (7,7) etc. depending on the level of blurring needed.
         sigma = 1  # Standard deviation of the kernel. Increasing this value leads to more blurring.
 
         # Adding blurr reduces processing when no corners found from 5s to 2s or less
@@ -825,8 +828,8 @@ class CameraWidget(QWidget):
             self.object_points.append(self.objp)
 
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
-            corners_refined = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results
-            #corners_refined = cv2.cornerSubPix(blurred, corners, (5, 5), (-1, -1), criteria)
+            #corners_refined = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results
+            corners_refined = cv2.cornerSubPix(blurred, corners, (5, 5), (-1, -1), criteria)
             #corners_refined = cv2.cornerSubPix(blurred, corners, (11, 11), (-1, -1), criteria)
 
             ## Now Store Corners Detected
@@ -938,8 +941,12 @@ class CameraWidget(QWidget):
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
             # Perform camera calibration
+            #ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
+            #    self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
+            #)
+
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-                self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
+                self.object_points, self.image_points, frame.shape[::-1], None, None
             )
 
             if ret:  # if calibration was successfully
@@ -1012,6 +1019,8 @@ class CameraWidget(QWidget):
             if file_name.startswith("corner_") and file_name.endswith(".png"):
                 file_path = os.path.join(self.config.tmp_data, file_name)
                 frame = cv2.imread(file_path)
+
+                
                 ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
 
                 if ret_corners:
@@ -1032,6 +1041,109 @@ class CameraWidget(QWidget):
             _img_shape = frame.shape[:2]
             
             calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
+
+            N_OK = len(obj_points)
+            K = np.zeros((3, 3))
+            D = np.zeros((4, 1))
+            rvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+            tvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
+
+            try:
+                rms, K, D, rvecs, tvecs = cv2.fisheye.calibrate(
+                    obj_points,
+                    img_points,
+                    _img_shape[::-1],
+                    K,
+                    D,
+                    rvecs,
+                    tvecs,
+                    calibration_flags,
+                    (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
+                )
+
+                # Check if the Root Mean Square (RMS) error is below threshold                    
+                self.evaluate_calibration(rms)
+
+                self.outputWindow.setText(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
+                print(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
+
+                self.camera_matrix = K
+                self.camera_dist_coeff = D
+
+                self.calibrate_DIM = _img_shape[::-1]
+
+                # Save intrinsic parameters to intrinsic.txt
+                if self.test_started == True: # TODO Not triggered when set to False
+                    with open(f"{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file:
+                        file.write("Camera Matrix:\n")
+                        file.write(str(self.camera_matrix))
+                        file.write("\n\nDistortion Coefficients:\n")
+                        file.write(str(self.camera_dist_coeff))
+
+                    self.outputWindow.setText(f"Rotation Vectors:{rvecs}")
+                    print("\n Rotation Vectors:")
+                    print(rvecs)
+
+                    self.outputWindow.setText(f"Translation Vectors:{tvecs}")
+                    print("\n Translation Vectors:")
+                    print(tvecs)
+
+                    # Save extrinsic parameters to extrinsic.txt
+                    with open(f"{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file:
+                        for i in range(len(rvecs)):
+                            file.write(f"\n\nImage {i+1}:\n")
+                            file.write(f"Rotation Vector:\n{rvecs[i]}\n")
+                            file.write(f"Translation Vector:\n{tvecs[i]}")
+                    
+                    self.outputWindow.setText(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
+                    print(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
+
+
+            except cv2.error as e:
+                print(f"Calibration failed with error: {e}")
+
+        else:
+            print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
+
+
+    def perform_calibration_fisheye_old(self):
+        print(f"test_calibration is set to: {self.test_started}")
+        print("Start Calibration")
+        self.update_status_signal.emit("Calibration in progress...")
+
+        # At this stage object_points and image_points are alread available when detect_corners was ran for loading images / frames etc
+        # Clear self.object_points and self.image_points to detect again?
+        self.object_points = []  # 3D points in real world space
+        self.image_points = []   # 2D points in image plane
+
+        # Now using tmp folder instead of input folder
+        image_files = sorted(os.listdir(self.config.tmp_data))
+        
+        for file_name in image_files:
+            if file_name.startswith("corner_") and file_name.endswith(".png"):
+                file_path = os.path.join(self.config.tmp_data, file_name)
+                frame = cv2.imread(file_path)
+                ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
+
+                if ret_corners:
+
+                    # Display the x and y coordinates of each corner
+                    for i, corner in enumerate(corners):
+                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+
+                    # TODO Collect the Corners to be saved to corners.vnl
+
+                    print("Calibration Succesfull")
+
+        if len(self.object_points) >= self.config.min_cap:  # Ensure there's enough data for calibration
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            obj_points = np.array(self.object_points)
+            img_points = np.array(self.image_points)
+            _img_shape = frame.shape[:2]
+            
+            #calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
+            calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW
 
             N_OK = len(obj_points)
             K = np.zeros((3, 3))
@@ -1147,6 +1259,7 @@ class CameraWidget(QWidget):
         # Start Calibration again also allow it to save intrinsic / extrinsic tmp files once -> Not working due to test_started value = True
         if self.input_images.isChecked():
             self.perform_calibration_fisheye()
+            #self.perform_calibration()
             self.current_image_index = -1
             self.load_next_image() 
 
@@ -1187,7 +1300,43 @@ class CameraWidget(QWidget):
             return frame
         
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
-    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients):
+    def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0, dim2=None, dim3=None):
+
+        if camera_matrix is None or distortion_coefficients is None:
+            print("No camera matrix or distortion coefficient detected, showing original frame")
+            return frame
+
+        DIM = self.calibrate_DIM
+        #print(f"Frame Dimension (DIM) = {DIM}")
+
+        dim1 = frame.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
+        #print(f"Frame Dimension input (DIM1) = {dim1}")
+
+        if not dim2:
+            dim2 = dim1 # Target dimension for the new camera matrix optimization
+        if not dim3:
+            dim3 = dim1 # Output image dimension for undistortion map
+
+        scaled_K = camera_matrix * dim1[0] / DIM[0]  # The values of K is to scale with image dimension.
+        scaled_K[2][2] = 1.0  # Except that K[2][2] is always 1.0
+
+        # Now, estimate the new camera matrix optimized for dim2 dimensions
+        new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
+        
+        print(f"Original Camera Matrix:\n{camera_matrix}")
+        print(f"New Camera Matrix:\n{new_K}")
+
+        # Initialize the undistort rectify map for the dimensions of the output image (dim3)
+        map1, map2 = cv2.fisheye.initUndistortRectifyMap(scaled_K, distortion_coefficients, np.eye(3), new_K, dim3, cv2.CV_16SC2)
+
+        # Finally, remap the image using the undistortion map for the corrected image
+        undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+        return undistorted_frame
+
+        
+    # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
+    def undistort_fisheye_frame_basic(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix and distortion_coefficients are available
         if camera_matrix is not None and distortion_coefficients is not None:
 
