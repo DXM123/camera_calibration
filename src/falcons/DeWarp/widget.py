@@ -782,16 +782,16 @@ class CameraWidget(QWidget):
         # Rescale image here from 1600 x 1216 (from Pylon) to 800 x 608
         # Get the dimensions of the original image
         #original_height, original_width = self.cv_image.shape[:2]
-        #original_height, original_width = frame.shape[:2]
+        original_height, original_width = frame.shape[:2]
 
         # Calculate the new dimensions (half of the original dimensions)
-        #new_width = original_width // 2
-        #new_height = original_height // 2
-        #dim = (new_width, new_height)
+        new_width = original_width // 2
+        new_height = original_height // 2
+        dim = (new_width, new_height)
 
         # Resize image
-        #self.cv_image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
-        self.cv_image = frame
+        self.cv_image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+        #self.cv_image = frame
 
         # Optionally to try downscaling image to run findchessboardcorners and use output corners as input on noral size image for FindCornerSubpix
         detection_start_time = time.time()
@@ -818,7 +818,8 @@ class CameraWidget(QWidget):
             # self.cameraFrame.resize(self.pixmap.size())
         else:
             # Display the original frame
-            self.pixmap = self.CameraToPixmap(frame)
+            #self.pixmap = self.CameraToPixmap(frame)
+            self.pixmap = self.CameraToPixmap(self.cv_image)
             self.cameraFrame.setPixmap(self.pixmap)
             # Optional: Resize if needed
             # self.cameraFrame.resize(self.pixmap.size())

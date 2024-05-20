@@ -88,7 +88,7 @@ class PylonThread(QThread):
             print(f"Exposure Time: {camera.ExposureTime.GetValue()}")
 
             camera.AcquisitionFrameRateEnable.SetValue(True)
-            camera.AcquisitionFrameRate.SetValue(1) # try with 1 fps
+            camera.AcquisitionFrameRate.SetValue(2) # try with 2 fps
 
             # Validate Settings
             print(f"Acquisition FrameRate Enable: {camera.AcquisitionFrameRateEnable.GetValue()}")
@@ -149,18 +149,20 @@ class PylonThread(QThread):
                     image = converter.Convert(grabResult)
                     img = image.GetArray()
 
-                    original_height, original_width = img.shape[:2]
+                    # Move outside of thread 
+                    #original_height, original_width = img.shape[:2]
 
                     # Calculate the new dimensions (half of the original dimensions)
-                    new_width = original_width // 2
-                    new_height = original_height // 2
-                    dim = (new_width, new_height)
+                    #new_width = original_width // 2
+                    #new_height = original_height // 2
+                    #dim = (new_width, new_height)
 
                     # Resize image
-                    img_scaled = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
+                    #img_scaled = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
 
                     # Send the img instead so we can process directly in opencv
-                    self.imageSignal.emit(img_scaled)
+                    self.imageSignal.emit(img)
+                    #self.imageSignal.emit(img_scaled)
 
                 grabResult.Release()
 
