@@ -4,7 +4,7 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from pypylon import pylon
 import numpy as np
-import cv2
+#import cv2
 
 # Basler Pylon : daA1920-160uc
 
