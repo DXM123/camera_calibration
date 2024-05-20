@@ -32,8 +32,6 @@ from .common import MarkerColors, SoccerFieldColors
 from .config import get_config
 from .soccer_field import SoccerField
 from .warper import Warper
-
-#from .pylonInput import cameraCapture
 from .pylonThread import PylonThread
 
 # MainWidget
@@ -229,10 +227,6 @@ class CameraWidget(QWidget):
 
         self.optionsFrame.layout.addLayout(self.input_layout)
 
-        #=========================================================================
-        # Add Camera Lens Options (Height for Az Angle and Fisheye toggle) (TODO)
-        #=========================================================================
-
         # Add options widgets to optionsFrame:
         option_label = QLabel("Chessboard Options:")
         self.optionsFrame.layout.addWidget(option_label)
@@ -317,7 +311,6 @@ class CameraWidget(QWidget):
         print(f"tab1inner initial size: {self.initialTab1InnerSize}")
 
         # Add Start De-warp Button last
-        # self.startButtonPwarp = QPushButton("START Perspective-Warp", self.tab2inner)
         self.startButtonPwarp = QPushButton("START Selecting Landmarks", self.tab2inner)
         self.startButtonPwarp.clicked.connect(self.start_pwarp)
         self.tab2inner.layout.addWidget(self.startButtonPwarp)
@@ -458,7 +451,7 @@ class CameraWidget(QWidget):
             self.captureButton1.clicked.connect(self.start_capture)
         elif self.input_pylon.isChecked():
             self.captureButton1.setEnabled(True)
-            self.captureButton1.setText("Initialize Pylon")
+            self.captureButton1.setText("Start Pylon Camera")
             self.captureButton1.clicked.connect(self.pylon_start)
             #self.captureButton1.clicked.connect(self.start_capture) 
         elif self.input_network.isChecked():
@@ -469,26 +462,54 @@ class CameraWidget(QWidget):
             self.captureButton1.setEnabled(False)
             
     def pylon_start(self):
-        #print ("Initialize Pylon Capture")
-        # Placeholder to select cam or set settings first
-        self.captureButton1.clicked.connect(self.start_capture)
+        # Using Pylon Thread instead of capture function
+        #self.captureButton1.clicked.connect(self.start_capture)
 
         # Start Pylon Thread
         self.thread = PylonThread()
+
+        #Logic if self test started the connect to different slot TODO
+
         # Connect the image signal to the slot
-        self.thread.imageSignal.connect(self.displayPylonImage) # --> Send to process function first and then update_image
-        #self.thread.imageSignal.connect(self.process_frame_for_corners) # Get the opencv compatible img and process
+        #self.thread.imageSignal.connect(self.displayPylonImage) # --> Send to process function first and then update_image
+        self.thread.imageSignal.connect(self.process_frame_for_corners) # Get the opencv compatible img and process
         
         # Start the thread
         self.thread.start()
 
-        self.captureButton1.setText("Pylon Camera Started")
+        # Emit the signal with the updated status text
+        self.update_status_signal.emit("Pylon Camera Started...")
         
         # Disable button
-        self.captureButton1.setEnabled(False)
+        #self.captureButton1.setEnabled(False)
+        try:
+            self.captureButton1.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
 
-        # TODO Add option to Stop thread
-    
+        # Make sure we can stop pylon when if needed -> TODO also when DONE is clicked (self.doneButton1)
+        self.captureButton1.setText("Stop Pylon Camera")
+        self.captureButton1.clicked.connect(self.pylon_stop)
+
+    def pylon_stop(self):
+        if PylonThread:
+            # Stop the thread
+            self.thread.stop()
+
+            # Emit the signal with the updated status text
+            self.update_status_signal.emit("Pylon Camera Stopped...")
+
+            try:
+                self.captureButton1.clicked.disconnect()
+            except TypeError:
+                # If no connections exist, a TypeError is raised. Pass in this case.
+                pass
+
+            #self.captureButton1.setText("Pylon Camera Stopped")
+            self.captureButton1.setText("Start Pylon Camera")
+            self.captureButton1.clicked.connect(self.pylon_start)
+
     # Browse input folder for images 
     def select_directory_and_load_images(self):
         options = QFileDialog.Options()
@@ -520,8 +541,18 @@ class CameraWidget(QWidget):
             self.cv_image = cv2.imread(self.image_files[self.current_image_index])
             self.update_image_feed(self.cv_image)
 
+            # Emit the signal with the updated status text
+            self.update_status_signal.emit("Image Loaded...")
+
+            # Set guiding info in output window
+            self.outputWindow.setText(f"Press Enter or space to load the next image")
+
+
         else:
             print("No more images in the directory.")
+
+            # Set guiding info in output window
+            self.outputWindow.setText(f"No more images to load, press DONE to process")
 
             # GOTO NEXT -> Press DONE
 
@@ -664,9 +695,6 @@ class CameraWidget(QWidget):
 
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
-        #frame = self.cap.get()
-        #ret = True
-
         # - self.cap.read() instead of .get()       #
         #############################################
 
@@ -676,14 +704,13 @@ class CameraWidget(QWidget):
             frame = self.cap.get()
             ret = True # Why set this static when video is added !
 
-        if self.input_pylon.isChecked():
+        if self.input_pylon.isChecked() or self.input_images.isChecked():
             ret = False
             # Get frame from Thread , for now set ret to False
 
         #print(f"test_calibration is set to: {self.test_started}")
 
         if ret:  # if frame captured successfully
-            #frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally --> Is this needed TODO
 
             # TODO Only flip for internal CAM and not input video !!
             if self.input_camera.isChecked() and not self.test_started:
@@ -713,7 +740,6 @@ class CameraWidget(QWidget):
                     
                 frame_inverted = undistorted_frame # cheesey replace
 
-            #if self.capture_started:
             if self.capture_started and not (self.test_started or self.cal_imported):
                 # Call detectCorners function
                 ret_corners, corners, frame_with_corners = self.detectCorners(
@@ -743,7 +769,6 @@ class CameraWidget(QWidget):
 
             # TODO Change frame_inverted name!!
 
-
             # Ensure the image does not scales with the label -> issue with aspect ratio TODO
             self.cameraFrame.setScaledContents(False)
             self.update()
@@ -751,10 +776,28 @@ class CameraWidget(QWidget):
     ############ NEW TODO #####################
 
     def process_frame_for_corners(self, frame):
+
+        # Get CV Image from frame (pylon already provides opencv format)
+
+        # Rescale image here from 1600 x 1216 (from Pylon) to 800 x 608
+        # Get the dimensions of the original image
+        #original_height, original_width = self.cv_image.shape[:2]
+        #original_height, original_width = frame.shape[:2]
+
+        # Calculate the new dimensions (half of the original dimensions)
+        #new_width = original_width // 2
+        #new_height = original_height // 2
+        #dim = (new_width, new_height)
+
+        # Resize image
+        #self.cv_image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+        self.cv_image = frame
+
         # Optionally to try downscaling image to run findchessboardcorners and use output corners as input on noral size image for FindCornerSubpix
         detection_start_time = time.time()
+
         ret_corners, corners, frame_with_corners = self.detectCorners(
-            frame, self.no_of_columns, self.no_of_rows
+            self.cv_image , self.no_of_columns, self.no_of_rows
         )
         print("Corner detection took: {:.2f} seconds".format(time.time() - detection_start_time))
 
@@ -763,7 +806,8 @@ class CameraWidget(QWidget):
             # self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
             print("Capturing in", self.countdown_seconds, "seconds...")
         elif ret_corners and self.countdown_seconds == 0:
-            self.save_screenshot(frame)  # Save the original frame
+            #self.save_screenshot(frame)  # Save the original frame
+            self.save_screenshot(self.cv_image)  # Save the original resized frame
             self.countdown_seconds = self.config.countdown_seconds  # Reset the countdown after saving
 
         if ret_corners:
@@ -940,11 +984,6 @@ class CameraWidget(QWidget):
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
-            # Perform camera calibration
-            #ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-            #    self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
-            #)
-
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
                 self.object_points, self.image_points, frame.shape[::-1], None, None
             )
@@ -955,11 +994,11 @@ class CameraWidget(QWidget):
                 print(f"Camera matrix found:{camera_matrix}")
 
                 # Print the RMS re-projection error
-                #print(f"RMS re-projection error: {ret}")
+                print(f"RMS re-projection error: {ret}")
 
                 # Check if the Root Mean Square (RMS) error is below threshold (Stored in ret)
                 # Hard to get RMS below 1.0 for normal calibration               
-                #self.evaluate_calibration(ret)
+                self.evaluate_calibration(ret)
 
                 # Assign camera_matrix to the instance variable
                 self.camera_matrix = camera_matrix
@@ -1289,8 +1328,13 @@ class CameraWidget(QWidget):
     def undistort_frame(self, frame, camera_matrix, distortion_coefficients):
         # Check if camera_matrix is available
         if self.camera_matrix is not None and self.camera_dist_coeff is not None:
+            
+            # Optimize Matrix
+            h, w = frame.shape[:2]
+            new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, (w, h), 1, (w, h))
             # Undistort the frame using the camera matrix and distortion coefficients
-            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
+            #undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
+            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients, None, new_camera_matrix)
 
             return undistorted_frame
 
@@ -1321,6 +1365,7 @@ class CameraWidget(QWidget):
         scaled_K[2][2] = 1.0  # Except that K[2][2] is always 1.0
 
         # Now, estimate the new camera matrix optimized for dim2 dimensions
+        # Need dim2 (balance=0) to get original undistorted frame withour extra's
         new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
         
         print(f"Original Camera Matrix:\n{camera_matrix}")

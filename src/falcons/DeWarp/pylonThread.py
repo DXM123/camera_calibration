@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from PyQt5.QtGui import QImage
 from PyQt5.QtCore import QThread, pyqtSignal
 from pypylon import pylon
 import numpy as np
+import cv2
+
+# Basler Pylon : daA1920-160uc
 
 class PylonThread(QThread):
     imageSignal = pyqtSignal(np.ndarray)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._stop_flag = False
 
     def run(self):
         #camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
@@ -85,7 +88,7 @@ class PylonThread(QThread):
             print(f"Exposure Time: {camera.ExposureTime.GetValue()}")
 
             camera.AcquisitionFrameRateEnable.SetValue(True)
-            camera.AcquisitionFrameRate.SetValue(10)
+            camera.AcquisitionFrameRate.SetValue(1) # try with 1 fps
 
             # Validate Settings
             print(f"Acquisition FrameRate Enable: {camera.AcquisitionFrameRateEnable.GetValue()}")
@@ -98,9 +101,9 @@ class PylonThread(QThread):
             print(f"Gain: {camera.Gain.GetValue()}")
             print(f"Gamma: {camera.Gamma.GetValue()}")
 
-            # TODO
-            #camera.GammaSelector.SetValue('sRGB')
-            #camera.BslColorSpace.SetValue('BslColorSpace_sRgb')
+            # Set the color space to sRGB
+            #camera.BslColorSpace.SetValue('BslColorSpace_sRGB') # not working
+            #camera.BslColorSpace.Value = "sRGB" # not working
 
             camera.BslHue.SetValue(0)
             camera.BslLightSourcePreset.SetValue('Daylight5000K')
@@ -127,8 +130,8 @@ class PylonThread(QThread):
             print("Resulting FPS:", camera.ResultingFrameRate.GetValue())
 
             # Set Max Buffer
-            camera.MaxNumBuffer = 5
-            camera.MaxNumGrabResults = 2
+            camera.MaxNumBuffer = 2 
+            camera.MaxNumGrabResults = 1
 
             # Grabing (video) with minimal delay
             camera.StartGrabbing(1, pylon.GrabStrategy_LatestImageOnly)
@@ -138,15 +141,26 @@ class PylonThread(QThread):
             converter.OutputPixelFormat = pylon.PixelType_BGR8packed
             converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
 
-            while camera.IsGrabbing():
+            #while camera.IsGrabbing():
+            while camera.IsGrabbing() and not self._stop_flag:
                 grabResult = camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
 
                 if grabResult.GrabSucceeded():
                     image = converter.Convert(grabResult)
                     img = image.GetArray()
 
-                    # Send the img instead so we can process directly in opencv TODO
-                    self.imageSignal.emit(img)
+                    original_height, original_width = img.shape[:2]
+
+                    # Calculate the new dimensions (half of the original dimensions)
+                    new_width = original_width // 2
+                    new_height = original_height // 2
+                    dim = (new_width, new_height)
+
+                    # Resize image
+                    img_scaled = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
+
+                    # Send the img instead so we can process directly in opencv
+                    self.imageSignal.emit(img_scaled)
 
                 grabResult.Release()
 
@@ -156,3 +170,7 @@ class PylonThread(QThread):
             if camera.IsGrabbing():
                 camera.StopGrabbing()
             camera.Close()
+
+    def stop(self):
+        self._stop_flag = True
+        self.wait()  # Wait for the thread to finish
