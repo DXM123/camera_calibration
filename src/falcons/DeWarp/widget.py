@@ -468,8 +468,6 @@ class CameraWidget(QWidget):
         # Start Pylon Thread
         self.thread = PylonThread()
 
-        #Logic if self test started the connect to different slot TODO
-
         # Connect the image signal to the slot
         #self.thread.imageSignal.connect(self.displayPylonImage) # --> Send to process function first and then update_image
         self.thread.imageSignal.connect(self.process_frame_for_corners) # Get the opencv compatible img and process
@@ -479,9 +477,10 @@ class CameraWidget(QWidget):
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Pylon Camera Started...")
+
+        # Start the countdown timer when capture is started
+        self.countdown_timer.start(1000)  # Update every 1000 milliseconds (1 second)
         
-        # Disable button
-        #self.captureButton1.setEnabled(False)
         try:
             self.captureButton1.clicked.disconnect()
         except TypeError:
@@ -493,9 +492,13 @@ class CameraWidget(QWidget):
         self.captureButton1.clicked.connect(self.pylon_stop)
 
     def pylon_stop(self):
-        if PylonThread:
+        #if PylonThread:
+        if PylonThread.thread:
             # Stop the thread
             self.thread.stop()
+
+            # Stop the timer when the button is clicked again
+            self.countdown_timer.stop()
 
             # Emit the signal with the updated status text
             self.update_status_signal.emit("Pylon Camera Stopped...")
@@ -598,7 +601,6 @@ class CameraWidget(QWidget):
         qformat = QImage.Format_RGB888
         img = QImage(image, image.shape[1], image.shape[0], image.strides[0], qformat)
         #img = img.rgbSwapped()  # BGR > RGB # needed for camera feed
-        #Resize here??
 
         return QPixmap.fromImage(img)
 
@@ -627,8 +629,6 @@ class CameraWidget(QWidget):
             print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
             print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
-            #######################################
-
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
             filename = f"{self.config.tmp_data}/b4-cal-test_{timestamp}.png"
@@ -636,13 +636,11 @@ class CameraWidget(QWidget):
             # Save the frame as an image
             cv2.imwrite(filename, image)
 
-            #################### Goes black below ######################
-
-            # prep for fisheye toggle> TODO Toggle now assume fisheye for images
-            if self.input_images.isChecked():
-                undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)
-            else:
+            # Camera input not fisheye TODO create fisheye toggle
+            if self.input_camera.isChecked():
                 undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
+            else:
+                undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)      
 
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
@@ -663,6 +661,8 @@ class CameraWidget(QWidget):
             # Set the buttons to the same width as cameraFrame
             #self.doneButton1.setFixedWidth(cameraFrameWidth)
             #self.captureButton1.setFixedWidth(cameraFrameWidth)
+
+            ##########################################
 
             # Use cameraFrame for tab1 and imageFrame for tab2
             if self.tabs.currentIndex() == 0:  # tab1 is at index 0
@@ -733,10 +733,10 @@ class CameraWidget(QWidget):
                 #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
 
                 # Camera input not fisheye TODO create fisheye toggle
-                if not self.input_camera.isChecked():
-                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                else:
+                if self.input_camera.isChecked():
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                     
                 frame_inverted = undistorted_frame # cheesey replace
 
@@ -776,6 +776,13 @@ class CameraWidget(QWidget):
     ############ NEW TODO #####################
 
     def process_frame_for_corners(self, frame):
+        # Read user-input values for columns, rows, and square size
+        self.no_of_columns = int(self.columnsInput.text())
+        self.no_of_rows = int(self.rowsInput.text())
+        self.square_size = float(self.squareSizeRow.text())
+
+        # Emit the signal with the updated status text
+        self.update_status_signal.emit("Capture in progess...")
 
         # Get CV Image from frame (pylon already provides opencv format)
 
@@ -791,38 +798,57 @@ class CameraWidget(QWidget):
 
         # Resize image
         self.cv_image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
-        #self.cv_image = frame
+        org_img = self.cv_image.copy()
 
-        # Optionally to try downscaling image to run findchessboardcorners and use output corners as input on noral size image for FindCornerSubpix
-        detection_start_time = time.time()
+        #########################################################################
+        # Undistort if test is started or calibration imported
+        if self.test_started or self.cal_imported:
 
-        ret_corners, corners, frame_with_corners = self.detectCorners(
-            self.cv_image , self.no_of_columns, self.no_of_rows
-        )
-        print("Corner detection took: {:.2f} seconds".format(time.time() - detection_start_time))
-
-        if ret_corners and self.countdown_seconds > 0:
-            # Optionally emit status update signal
-            # self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
-            print("Capturing in", self.countdown_seconds, "seconds...")
-        elif ret_corners and self.countdown_seconds == 0:
-            #self.save_screenshot(frame)  # Save the original frame
-            self.save_screenshot(self.cv_image)  # Save the original resized frame
-            self.countdown_seconds = self.config.countdown_seconds  # Reset the countdown after saving
-
-        if ret_corners:
-            # Display the frame with corners
-            self.pixmap = self.CameraToPixmap(frame_with_corners)
-            self.cameraFrame.setPixmap(self.pixmap)
-            # Optional: Resize if needed
-            # self.cameraFrame.resize(self.pixmap.size())
-        else:
+            # Camera input not fisheye TODO create fisheye toggle
+            if self.input_camera.isChecked():
+                undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+            else:
+                undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)       
+            
             # Display the original frame
             #self.pixmap = self.CameraToPixmap(frame)
-            self.pixmap = self.CameraToPixmap(self.cv_image)
+            self.pixmap = self.CameraToPixmap(undistorted_frame)
             self.cameraFrame.setPixmap(self.pixmap)
-            # Optional: Resize if needed
-            # self.cameraFrame.resize(self.pixmap.size())
+        
+        else:
+
+        ###########################################################################
+
+            # Optionally to try downscaling image to run findchessboardcorners and use output corners as input on noral size image for FindCornerSubpix
+            detection_start_time = time.time()
+
+            ret_corners, corners, frame_with_corners = self.detectCorners(
+                self.cv_image , self.no_of_columns, self.no_of_rows
+            )
+            print("Corner detection took: {:.2f} seconds".format(time.time() - detection_start_time))
+
+            if ret_corners and self.countdown_seconds > 0:
+                # Optionally emit status update signal
+                # self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
+                print("Capturing in", self.countdown_seconds, "seconds...")
+            elif ret_corners and self.countdown_seconds == 0:
+                #self.save_screenshot(frame)  # Save the original frame
+                self.save_screenshot(org_img)  # Save the original resized frame
+                self.countdown_seconds = self.config.countdown_seconds  # Reset the countdown after saving
+
+            if ret_corners:
+                # Display the frame with corners
+                self.pixmap = self.CameraToPixmap(frame_with_corners)
+                self.cameraFrame.setPixmap(self.pixmap)
+                # Optional: Resize if needed
+                # self.cameraFrame.resize(self.pixmap.size())
+            else:
+                # Display the original frame
+                #self.pixmap = self.CameraToPixmap(frame)
+                self.pixmap = self.CameraToPixmap(self.cv_image)
+                self.cameraFrame.setPixmap(self.pixmap)
+                # Optional: Resize if needed
+                # self.cameraFrame.resize(self.pixmap.size())
 
     def displayPylonImage(self, img):
             self.pixmap = self.CameraToPixmap(img)
@@ -858,6 +884,8 @@ class CameraWidget(QWidget):
         # Adding blurr reduces processing when no corners found from 5s to 2s or less
         blurred = cv2.GaussianBlur(gray, kernel_size, sigma)
 
+        # TODO only used blurred for Pylon Camera to speed up detection ?
+
         # Find the chess board corners. If desired number of corners are found in the image then ret = true
         #findchessboard_start_time = time.time()
         ret, corners = cv2.findChessboardCorners(
@@ -872,10 +900,13 @@ class CameraWidget(QWidget):
             # Now Store Object Points 
             self.object_points.append(self.objp)
 
+            ###################################### Blurring vs Gray ################################################################
+            #-> refining on gray img for better results breaks the results!!!
+
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
-            #corners_refined = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results
-            corners_refined = cv2.cornerSubPix(blurred, corners, (5, 5), (-1, -1), criteria)
-            #corners_refined = cv2.cornerSubPix(blurred, corners, (11, 11), (-1, -1), criteria)
+            corners_refined = cv2.cornerSubPix(blurred, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results breaks the results!!!
+
+            #######################################################################################################################
 
             ## Now Store Corners Detected
             #self.image_points.append(corners)
@@ -929,6 +960,11 @@ class CameraWidget(QWidget):
             self.timer.stop()  # Stop camera feed
             self.countdown_timer.stop()  # Stop countdown
 
+            #self.timer_pylon.stop() # Stop Pylon counter
+            if self.input_pylon.isChecked():
+                if PylonThread.thread:
+                    self.pylon_stop() # Stop Pylon Thread
+
             # Update button text
             self.captureButton1.setText("Capture Finished")
             self.captureButton1.setDisabled(True)
@@ -973,11 +1009,13 @@ class CameraWidget(QWidget):
                     # Display the x and y coordinates of each corner
                     for i, corner in enumerate(corners):
                         x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
-                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+                        #print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
 
                     # TODO Collect the Corners to be saved to corners.vnl
 
                     print("Calibration Succesfull")
+                else:
+                    print(f"No Corners Detected in {file_path}")
 
         # check with min_cap for minimum images needed for calibration (Default should be 10) (3 for now)
         if len(self.object_points) >= self.config.min_cap:
@@ -985,9 +1023,35 @@ class CameraWidget(QWidget):
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
+###########################################################################################################
+#  Dirty work a round for differences in image format 2 or 3 values
+
+            #ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
+            #    self.object_points, self.image_points, frame.shape[::-1], None, None
+            #)
+
+            #if self.input_camera.isChecked() or self.input_pylon.isChecked():
+            #    # Perform camera calibration
+            #    ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
+            #        self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
+            #    )
+            #else:
+            #    ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
+            #        self.object_points, self.image_points, frame.shape[::-1], None, None
+            #    )
+            
+            # Using frame.shape[:2][::-1] should fix the issue
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-                self.object_points, self.image_points, frame.shape[::-1], None, None
+                self.object_points, self.image_points, frame.shape[:2][::-1], None, None
             )
+
+            # TODO : frame.shape[1] vs frame.shape[::-1] vs frame.shape[:2][::-1] 
+
+            #frame.shape[1] gives the width of the frame.
+            #frame.shape[::-1] gives the dimensions of the frame in reverse order.
+            #frame.shape[:2][::-1] gives the height and width of the frame in reverse order, excluding any additional dimensions like color channels.
+
+#########################################################################################################     
 
             if ret:  # if calibration was successfully
                 # Display the calibration results
@@ -1068,7 +1132,7 @@ class CameraWidget(QWidget):
                     # Display the x and y coordinates of each corner
                     for i, corner in enumerate(corners):
                         x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
-                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+                        #print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
 
                     # TODO Collect the Corners to be saved to corners.vnl
 
@@ -1078,7 +1142,8 @@ class CameraWidget(QWidget):
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             obj_points = np.array(self.object_points)
             img_points = np.array(self.image_points)
-            _img_shape = frame.shape[:2]
+            #_img_shape = frame.shape[:2]
+            _img_shape = frame.shape[:2][::-1]
             
             calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
 
@@ -1092,7 +1157,8 @@ class CameraWidget(QWidget):
                 rms, K, D, rvecs, tvecs = cv2.fisheye.calibrate(
                     obj_points,
                     img_points,
-                    _img_shape[::-1],
+                    #_img_shape[::-1],
+                    _img_shape,
                     K,
                     D,
                     rvecs,
@@ -1110,7 +1176,8 @@ class CameraWidget(QWidget):
                 self.camera_matrix = K
                 self.camera_dist_coeff = D
 
-                self.calibrate_DIM = _img_shape[::-1]
+                #self.calibrate_DIM = _img_shape[::-1]
+                self.calibrate_DIM = _img_shape
 
                 # Save intrinsic parameters to intrinsic.txt
                 if self.test_started == True: # TODO Not triggered when set to False
@@ -1170,7 +1237,7 @@ class CameraWidget(QWidget):
                     # Display the x and y coordinates of each corner
                     for i, corner in enumerate(corners):
                         x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
-                        print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
+                        #print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
 
                     # TODO Collect the Corners to be saved to corners.vnl
 
@@ -1182,8 +1249,8 @@ class CameraWidget(QWidget):
             img_points = np.array(self.image_points)
             _img_shape = frame.shape[:2]
             
-            #calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
-            calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW
+            calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
+            #calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW
 
             N_OK = len(obj_points)
             K = np.zeros((3, 3))
@@ -1246,6 +1313,52 @@ class CameraWidget(QWidget):
         else:
             print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
 
+#########################################################################################
+
+    def verify_rms_prev(self, rms):
+        # Exceptional: RMS < 0.1
+        if rms < 0.1:
+            return "Exceptional"
+
+        # Very Good: 0.1 <= RMS < 0.3
+        elif rms < 0.3:
+            return "Very Good"
+
+        # Good: 0.3 <= RMS < 0.5
+        elif rms < 0.5:
+            return "Good"
+
+        # Acceptable: 0.5 <= RMS < 1.0
+        elif rms < 1.0:
+            return "Acceptable"
+
+        # Acceptable: 0.5 <= RMS < 1.0
+        elif rms > 1.0:
+            return "Not Acceptable"
+
+        # Poor: RMS >= 1.0
+        else:
+            return "Very Poor"
+
+    def evaluate_calibration_prev(self, rms):
+        # Check RMS and categorize calibration quality (Work for Fisheye, but diff valies for non fisheye)
+        quality = self.verify_rms(rms)
+
+        # Print message or raise error based on RMS quality
+        if quality in ["Exceptional", "Very Good", "Good"]:
+            #print(f"RMS is {rms}, indicating {quality} calibration quality.")
+            green_bold = "\033[32m\033[1m"
+            reset = "\033[0m"  # Resets the style to default
+            print(f"{green_bold}RMS is {rms}, indicating {quality} calibration quality.{reset}")
+        elif quality is ["Acceptable"]:
+            orange_bold = "\033[38;2;255;165;0m\033[1m"
+            reset = "\033[0m"  # Resets the style to default
+            print(f"{orange_bold}RMS is {rms}, indicating {quality} calibration quality.{reset}")
+        else:
+            self.timer.stop()
+            raise ValueError(f"RMS is {rms}, indicating Poor calibration quality. Recalibration required.")
+            # Add Retry option
+
     def verify_rms(self, rms):
         # Exceptional: RMS < 0.1
         if rms < 0.1:
@@ -1261,26 +1374,30 @@ class CameraWidget(QWidget):
 
         # Acceptable: 0.5 <= RMS < 1.0
         elif rms < 1.0:
+            return "Acceptable"
+
+        # Not Acceptable: RMS >= 1.0
+        else:
             return "Not Acceptable"
 
-        # Poor: RMS >= 1.0
-        else:
-            return "Very Poor"
-
     def evaluate_calibration(self, rms):
-        # Check RMS and categorize calibration quality (Work for Fisheye, but diff valies for non fisheye)
+        # Check RMS and categorize calibration quality
         quality = self.verify_rms(rms)
 
         # Print message or raise error based on RMS quality
         if quality in ["Exceptional", "Very Good", "Good"]:
-            #print(f"RMS is {rms}, indicating {quality} calibration quality.")
             green_bold = "\033[32m\033[1m"
             reset = "\033[0m"  # Resets the style to default
             print(f"{green_bold}RMS is {rms}, indicating {quality} calibration quality.{reset}")
+        elif quality == "Acceptable":
+            orange_bold = "\033[38;2;255;165;0m\033[1m"
+            reset = "\033[0m"  # Resets the style to default
+            print(f"{orange_bold}RMS is {rms}, indicating {quality} calibration quality.{reset}")
         else:
             self.timer.stop()
             raise ValueError(f"RMS is {rms}, indicating Poor calibration quality. Recalibration required.")
-            # Add Retry option
+
+##############################################################################################################
 
     def generate_object_points(self, columns, rows, square_size):
         objp = np.zeros((1, columns * rows, 3), np.float32)
@@ -1304,8 +1421,16 @@ class CameraWidget(QWidget):
             self.load_next_image() 
 
         if self.input_camera.isChecked():
-            self.timer.start(100) # Start camera feed
             self.perform_calibration()
+            self.timer.start(100) # Start camera feed
+
+########################################################################################
+
+        if self.input_pylon.isChecked():
+            self.perform_calibration_fisheye() # Somethings off using Pylon and the <New Camera Matrix:> calculated
+            self.pylon_start()
+
+#######################################################################################
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....")
@@ -1330,12 +1455,18 @@ class CameraWidget(QWidget):
         # Check if camera_matrix is available
         if self.camera_matrix is not None and self.camera_dist_coeff is not None:
             
+            #DIM = self.calibrate_DIM
+
             # Optimize Matrix
-            h, w = frame.shape[:2]
-            new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, (w, h), 1, (w, h))
+            #h, w = frame.shape[:2]
+            #dim = frame.shape[:2][::-1]
+
+            #new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, (w, h), 1, (w, h))
+            #new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, dim, 1, dim)
+
             # Undistort the frame using the camera matrix and distortion coefficients
-            #undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
-            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients, None, new_camera_matrix)
+            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
+            #undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients, None, new_camera_matrix)
 
             return undistorted_frame
 
@@ -1354,8 +1485,18 @@ class CameraWidget(QWidget):
         DIM = self.calibrate_DIM
         #print(f"Frame Dimension (DIM) = {DIM}")
 
+########################################################################################################
+        # Below working for pylon / cam (not for images)
         dim1 = frame.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
+        # TODO : frame.shape[1] vs frame.shape[::-1] vs frame.shape[:2][::-1] 
+
+        #frame.shape[1] gives the width of the frame.
+        #frame.shape[::-1] gives the dimensions of the frame in reverse order.
+        #frame.shape[:2][::-1] gives the height and width of the frame in reverse order, excluding any additional dimensions like color channels.
+
+        #h, w = frame.shape[:2]
         #print(f"Frame Dimension input (DIM1) = {dim1}")
+########################################################################################################
 
         if not dim2:
             dim2 = dim1 # Target dimension for the new camera matrix optimization
@@ -1369,8 +1510,8 @@ class CameraWidget(QWidget):
         # Need dim2 (balance=0) to get original undistorted frame withour extra's
         new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
         
-        print(f"Original Camera Matrix:\n{camera_matrix}")
-        print(f"New Camera Matrix:\n{new_K}")
+        #print(f"Original Camera Matrix:\n{camera_matrix}")
+        #print(f"New Camera Matrix:\n{new_K}")
 
         # Initialize the undistort rectify map for the dimensions of the output image (dim3)
         map1, map2 = cv2.fisheye.initUndistortRectifyMap(scaled_K, distortion_coefficients, np.eye(3), new_K, dim3, cv2.CV_16SC2)
@@ -1448,6 +1589,13 @@ class CameraWidget(QWidget):
             # Stop Camera feed
             self.timer.stop()
 
+            # Stop any conuntdowns
+            self.countdown_timer.stop()
+
+            if self.input_pylon.isChecked():
+                if PylonThread.thread:
+                    self.pylon_stop()
+
             # Stop Input
             self.cameraFrame.keyPressEvent = None
             self.cameraFrame.mousePressEvent = None
@@ -1499,10 +1647,11 @@ class CameraWidget(QWidget):
                 # Get frame --> TODO check all placed where self.cv_image is stored
                 frame = self.cv_image
 
-                if self.input_images.isChecked():
-                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                else:
+                # Camera input not fisheye TODO create fisheye toggle
+                if self.input_camera.isChecked():
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                 undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
                 self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
@@ -1556,6 +1705,11 @@ class CameraWidget(QWidget):
             elif self.network_dewarp == True:
                 # network_dewarp()
                 print("Starting network de-warp")  # -> update status
+
+            elif self.pylon_dewarp == True:
+                # network_dewarp()
+                print("Starting Pylon de-warp")  # -> update status
+
         else:
             # Disable the first tab (Camera Calibration)
             self.tabs.setTabEnabled(0, False) # Should not be here !
@@ -1831,10 +1985,11 @@ class CameraWidget(QWidget):
 
                 frame = self.cv_image
 
-                if self.input_images.isChecked():
-                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                else:
+                # Camera input not fisheye TODO create fisheye toggle
+                if self.input_camera.isChecked():
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                else:
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                 undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
 
@@ -1975,11 +2130,11 @@ class CameraWidget(QWidget):
 
                 frame = self.cv_image
 
-                # Not really needed since images now always use fisheye, but prep for fisheye toggle
-                if self.input_images.isChecked():
-                    undistorted_frame = self.undistort_fisheye_frame(frame.copy(), self.camera_matrix, self.camera_dist_coeff)
+                # Camera input not fisheye TODO create fisheye toggle
+                if self.input_camera.isChecked():
+                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
-                    undistorted_frame = self.undistort_frame(frame.copy(), self.camera_matrix, self.camera_dist_coeff)
+                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
 
                 undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
                 self.pixmap = self.imageToPixmap(undistorted_frame_rgb)

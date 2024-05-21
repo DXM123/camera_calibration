@@ -28,7 +28,6 @@ class PylonThread(QThread):
             camera.UserSetSelector.Value = "Default"
             camera.UserSetLoad.Execute()
 
-        #try:
             CAM_HEIGHT = 800  # Example base height
             CAM_WIDTH = 608  # Example base width
 
