@@ -470,7 +470,7 @@ class CameraWidget(QWidget):
 
         # Connect the image signal to the slot
         #self.thread.imageSignal.connect(self.displayPylonImage) # --> Send to process function first and then update_image
-        self.thread.imageSignal.connect(self.process_frame_for_corners) # Get the opencv compatible img and process
+        self.thread.imageSignal.connect(self.process_pylon_frame) # Get the opencv compatible img and process
         
         # Start the thread
         self.thread.start()
@@ -775,7 +775,7 @@ class CameraWidget(QWidget):
     
     ############ NEW TODO #####################
 
-    def process_frame_for_corners(self, frame):
+    def process_pylon_frame(self, frame):
         # Read user-input values for columns, rows, and square size
         self.no_of_columns = int(self.columnsInput.text())
         self.no_of_rows = int(self.rowsInput.text())
@@ -806,9 +806,9 @@ class CameraWidget(QWidget):
 
             # Camera input not fisheye TODO create fisheye toggle
             if self.input_camera.isChecked():
-                undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                undistorted_frame = self.undistort_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)
             else:
-                undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)       
+                undistorted_frame = self.undistort_fisheye_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)       
             
             # Display the original frame
             #self.pixmap = self.CameraToPixmap(frame)
@@ -878,18 +878,19 @@ class CameraWidget(QWidget):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Apply Gaussian blur
-        kernel_size = (3, 3)  # Kernel size can be (3,3), (5,5), (7,7) etc. depending on the level of blurring needed.
-        sigma = 1  # Standard deviation of the kernel. Increasing this value leads to more blurring.
+        #kernel_size = (3, 3)  # Kernel size can be (3,3), (5,5), (7,7) etc. depending on the level of blurring needed.
+        #sigma = 1  # Standard deviation of the kernel. Increasing this value leads to more blurring.
 
         # Adding blurr reduces processing when no corners found from 5s to 2s or less
-        blurred = cv2.GaussianBlur(gray, kernel_size, sigma)
+        #blurred = cv2.GaussianBlur(gray, kernel_size, sigma)
+
 
         # TODO only used blurred for Pylon Camera to speed up detection ?
 
         # Find the chess board corners. If desired number of corners are found in the image then ret = true
         #findchessboard_start_time = time.time()
         ret, corners = cv2.findChessboardCorners(
-            blurred,
+            gray,
             (columns, rows),
             flags,
         )
@@ -904,7 +905,7 @@ class CameraWidget(QWidget):
             #-> refining on gray img for better results breaks the results!!!
 
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
-            corners_refined = cv2.cornerSubPix(blurred, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results breaks the results!!!
+            corners_refined = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results breaks the results!!!
 
             #######################################################################################################################
 
@@ -1107,6 +1108,7 @@ class CameraWidget(QWidget):
 
 
     def perform_calibration_fisheye(self):
+
         print(f"test_calibration is set to: {self.test_started}")
         print("Start Calibration")
         self.update_status_signal.emit("Calibration in progress...")
