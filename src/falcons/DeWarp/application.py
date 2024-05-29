@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import numpy as np
 #import tempfile
 
 from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow, QMessageBox, QStatusBar
@@ -78,12 +79,21 @@ class CamCalMain(QMainWindow):
                     data = json.load(f)
 
                     # Load into camera widget variable
-                    self.camera_widget.camera_matrix = data.get("camera_matrix")
-                    self.camera_widget.camera_dist_coeff = data.get("dist_coeff")
+                    #self.camera_widget.camera_matrix = data.get("camera_matrix")
+                    #self.camera_widget.camera_dist_coeff = data.get("dist_coeff")
+
+                    # Convert lists to numpy arrays
+                    self.camera_widget.camera_matrix = np.array(data.get("camera_matrix"))
+                    self.camera_widget.camera_dist_coeff = np.array(data.get("dist_coeff"))
+
 
                     # Validate shape
                     if self.camera_widget.camera_matrix.shape != (3, 3):
                         raise ValueError("Camera matrix must be a 3x3 array.")
+
+                    # Validate shape of distortion coefficients if necessary
+                    if self.camera_widget.camera_dist_coeff.shape != (4, 1):
+                        raise ValueError("Distortion coefficients must be a 4x1 array.")
 
                     # Emit the signal with the updated status text
                     self.camera_widget.update_status_signal.emit(f"Calibration parameters loaded from {file_name}")

@@ -78,6 +78,7 @@ class CameraWidget(QWidget):
         self.network_dewarp = False  # Track if an network stream is used for dewarping
         self.pylon_dewarp = False  # Track if an pylon stream is used for dewarping
         self.image_tuning_dewarp = False  # Track if an image tuning is used for dewarping
+        self.verify_lut_started = False # Track if LUT testing is started
 
         # Need the camera object in this Widget
         self.cap = video
@@ -94,6 +95,10 @@ class CameraWidget(QWidget):
 
         # Add field_image Temp
         self.field_image = None
+
+        # Add LUT and LUT File Name
+        self.lut_filename = None
+        self.lut = None
 
         # Placeholder to count the ammount of images saved
         self.ImagesCounter = 0
@@ -780,6 +785,9 @@ class CameraWidget(QWidget):
         self.no_of_columns = int(self.columnsInput.text())
         self.no_of_rows = int(self.rowsInput.text())
         self.square_size = float(self.squareSizeRow.text())
+        
+        if frame is None:
+            raise ValueError("Frame is None")
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Capture in progess...")
@@ -803,6 +811,12 @@ class CameraWidget(QWidget):
         #########################################################################
         # Undistort if test is started or calibration imported
         if self.test_started or self.cal_imported:
+
+            if self.camera_matrix is None:
+                raise ValueError("camera_matrix is None")
+
+            if self.camera_dist_coeff is None:
+                raise ValueError("camera_dist_coeff is None")
 
             # Camera input not fisheye TODO create fisheye toggle
             if self.input_camera.isChecked():
@@ -1407,29 +1421,42 @@ class CameraWidget(QWidget):
         return objp
 
     #######################################################################
+    # Issue when calibration is loaden from JSON TODO
 
     def test_calibration(self):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
+
+        if self.camera_matrix is None:
+            raise ValueError("camera_matrix is None")
+        if self.camera_dist_coeff is None:
+            raise ValueError("camera_dist_coeff is None")
+
+        # Debug print for camera matrix and distortion coefficients
+        print(f"Using Camera Matrix:\n{self.camera_matrix}")
+        print(f"Using Distortion Coefficients:\n{self.camera_dist_coeff}")
 
         # Set test boolean to prevent mutiple saves (or 10 rows lower?)
         self.test_started = True
 
         # Start Calibration again also allow it to save intrinsic / extrinsic tmp files once -> Not working due to test_started value = True
         if self.input_images.isChecked():
-            self.perform_calibration_fisheye()
-            #self.perform_calibration()
-            self.current_image_index = -1
-            self.load_next_image() 
+            if not self.cal_imported:
+                self.perform_calibration_fisheye()
+                #self.perform_calibration()
+                self.current_image_index = -1
+                self.load_next_image() 
 
         if self.input_camera.isChecked():
-            self.perform_calibration()
+            if not self.cal_imported:
+                self.perform_calibration()
             self.timer.start(100) # Start camera feed
 
 ########################################################################################
 
         if self.input_pylon.isChecked():
-            self.perform_calibration_fisheye() # Somethings off using Pylon and the <New Camera Matrix:> calculated
+            if not self.cal_imported:
+                self.perform_calibration_fisheye() # Somethings off using Pylon and the <New Camera Matrix:> calculated
             self.pylon_start()
 
 #######################################################################################
@@ -1480,24 +1507,38 @@ class CameraWidget(QWidget):
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
     def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0, dim2=None, dim3=None):
 
+        if camera_matrix is None:
+            raise ValueError("camera_matrix is None")
+        if frame is None:
+            raise ValueError("cv_image is None")
+        if distortion_coefficients is None:
+            raise ValueError("camera_dist_coeff is None")
+
+
         if camera_matrix is None or distortion_coefficients is None:
             print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
+        
+#########################################################################################################
 
-        DIM = self.calibrate_DIM
-        #print(f"Frame Dimension (DIM) = {DIM}")
+        DIM = self.calibrate_DIM # Usue when inporting calibration , then this is None TODO Also store DIM in Calibration JSON
+        print(f"Frame Dimension (DIM) = {DIM}")
 
 ########################################################################################################
         # Below working for pylon / cam (not for images)
         dim1 = frame.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
         # TODO : frame.shape[1] vs frame.shape[::-1] vs frame.shape[:2][::-1] 
 
+        # Temp work a round when importing calibration
+        if not DIM and self.cal_imported:
+            DIM = dim1
+
         #frame.shape[1] gives the width of the frame.
         #frame.shape[::-1] gives the dimensions of the frame in reverse order.
         #frame.shape[:2][::-1] gives the height and width of the frame in reverse order, excluding any additional dimensions like color channels.
 
         #h, w = frame.shape[:2]
-        #print(f"Frame Dimension input (DIM1) = {dim1}")
+        print(f"Frame Dimension input (dim1) = {dim1}")
 ########################################################################################################
 
         if not dim2:
@@ -1708,9 +1749,14 @@ class CameraWidget(QWidget):
                 # network_dewarp()
                 print("Starting network de-warp")  # -> update status
 
+            ##############################################################
+
+            # Start Pylon Thread again
             elif self.pylon_dewarp == True:
                 # network_dewarp()
                 print("Starting Pylon de-warp")  # -> update status
+
+            ############################################################3
 
         else:
             # Disable the first tab (Camera Calibration)
@@ -1886,11 +1932,73 @@ class CameraWidget(QWidget):
         self.startButtonPwarp.setText("Save to binary file")
         self.startButtonPwarp.clicked.connect(self.save_prep_mat_binary)
 
+        ###############################################################
+        # Move to Testing LUT generated by save_prep_mat_binary
+
+        # For now Quit App
+        #self.startButtonPwarp.setText("DONE")
+        self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
+        self.startButtonPwarp.clicked.connect(
+            #self.close_application
+            self.verify_lut
+        )  # close when done
+
+        ##############################################################
+
+    def verify_lut(self):
+        print(f"Start Verify Lookup Table (LUT)")
+        # CLick (Mouse Click event) ImageFrame and get x,y -> get x,y from LUT and show transformed point of imageField
+        # Input Generated LUT binary file
+        # Input Mouse Clicks x,y on imageFrame
+        # OutPut x,y on field_image
+
+        #Clear and Enable Frame again to load test frame
+        self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
+        self.imageFrame.setEnabled(False)
+
+        #self.startButtonPwarp.clicked.connect(self.start_pwarp)
+
+        try:
+            self.loadImage.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
+
+        self.loadImage.setEnabled(True)
+        self.loadImage.setText("Load Test Image")
+        self.loadImage.clicked.connect(self.load_image)
+
+        # Only load LUT once during start
+        if not self.verify_lut_started:
+            ### Could also load lut like:
+            #self.lut = None # Clear if needed
+            if self.lut is None:
+                #Load LUT 
+                self.lut = self.load_lut_from_binary(self.lut_filename)
+
+            # Set LUT verify as Started
+            self.verify_lut_started = True
+
+        ## Get Mouse Click Event to provide to query lut
+        self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
+
+        ### And query like:
+        #transformed_point = self.query_lut(lut, x, y)
+
+        # First, disconnect all previously connected signals to avoid multiple connections.
+        try:
+            self.startButtonPwarp.clicked.disconnect()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
+
         # For now Quit App
         self.startButtonPwarp.setText("DONE")
         self.startButtonPwarp.clicked.connect(
             self.close_application
-        )  # close when done
+        ) 
+
+    ##########################################################################
 
     def draw_landmark(self, image, landmark, color):
         # Draw the landmark
@@ -1997,6 +2105,25 @@ class CameraWidget(QWidget):
 
                 bgimage = cv2.rectangle(undistorted_frame_rgb, (x, y), (x + 2, y + 2), (SoccerFieldColors.Green.value), 2)
                 self.display_landmarks(bgimage)
+
+                if self.verify_lut_started:
+                    transformed_point = self.query_lut(self.lut, x, y)
+
+                    if transformed_point:
+                        print(f"Original point: ({x}, {y})")
+                        print(f"Transformed point: {transformed_point}")
+                    else:
+                        print("Point is out of the bounds of the LUT.")
+
+                ####################################################################
+
+                # Draw Transformed points on soccer Field Image
+                #self.field_image_selected = self.draw_landmark_selected(
+                #    self.field_image.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
+                #)
+
+                ##################################################################
+
             else:
                 print("Pixmap is not set")
 
@@ -2216,23 +2343,46 @@ class CameraWidget(QWidget):
         return True
     
     def save_prep_mat_binary(self):
-        # Set Filename static for now TODO
+        # Set Filename static for now TODO add date
         filename = "mat.bin"
+        self.lut_filename = filename
 
         # Get Shape of dewarped image
-        img_shape = self.dewarped_frame.shape[:2] # TODO needs to be cutout of ROI not whole frame
+        img_shape = self.dewarped_frame.shape[:2] # Do we save everything ? Yes for now
 
         # Create the lookup table
-        lut = self.warper.create_lookup_table(img_shape)
+        self.lut = self.warper.create_lookup_table(img_shape)
 
         print(f"Saving to binary file {filename} and saving Mat image")
 
         #return self.save_mat_binary(filename, mat)
-        return self.save_mat_binary(filename, lut)
+        return self.save_mat_binary(filename, self.lut)
 
     def save_mat_binary(self, filename, output):
         with open(filename, 'wb') as ofs:
             return self.write_mat_binary(ofs, output)
+        
+    def load_lut_from_binary(self, filename):
+
+        with open(filename, 'rb') as file:
+            rows = int.from_bytes(file.read(4), byteorder='little')
+            cols = int.from_bytes(file.read(4), byteorder='little')
+            dtype_size = int.from_bytes(file.read(4), byteorder='little')
+            
+            # Assuming the LUT was saved as float32 for both x' and y' values
+            dtype = np.float32
+            lut = np.frombuffer(file.read(), dtype=dtype).reshape((rows, cols, 2))
+            
+        return lut
+
+    def query_lut(sel, lut, x, y):
+
+        if 0 <= y < lut.shape[0] and 0 <= x < lut.shape[1]:
+            return tuple(lut[y, x])
+        else:
+            return None  # Out of bounds
+
+    ########### Below not used #############################################
 
     def read_mat_binary(self, ifs, in_mat):
         if not ifs:
@@ -2250,6 +2400,8 @@ class CameraWidget(QWidget):
     def load_mat_binary(self, filename, output):
         with open(filename, 'rb') as ifs:
             return self.read_mat_binary(ifs, output)
+        
+    ###################################################################################
 
     def close_application(self):
         QApplication.quit()
