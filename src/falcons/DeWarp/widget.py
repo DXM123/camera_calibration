@@ -1823,9 +1823,7 @@ class CameraWidget(QWidget):
 
         #Clear and Enable Frame again to load test frame
         #self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Maybe not best (keep current to test)
-        self.imageFrame.setEnabled(True)
-
-        #self.startButtonPwarp.clicked.connect(self.start_pwarp)
+        self.imageFrame.setEnabled(True) # Enable ImageFrame again
 
         try:
             self.loadImage.clicked.disconnect()
@@ -1981,6 +1979,34 @@ class CameraWidget(QWidget):
                     if transformed_point:
                         print(f"Original point: ({x}, {y})")
                         print(f"Transformed point: {transformed_point}")
+
+                        #Refine transformed point to support x, y
+                        # Round the transformed point coordinates to the nearest integers
+                        rounded_transformed_point = (round(transformed_point[0]), round(transformed_point[1]))
+
+                        print(f"Transformed point (Rounded): {rounded_transformed_point}")
+
+                        # Draw Transformed points on soccer Field Image
+                        #self.field_image_selected = self.draw_landmark_selected(
+                        #    self.field_image.copy(), transformed_point, MarkerColors.Yellow.value
+                        #)
+
+                        # Using rounded values
+                        self.field_image_selected = self.draw_landmark_selected(
+                            self.field_image.copy(), rounded_transformed_point, MarkerColors.Yellow.value
+                        )
+
+                        # Convert to Pixman
+                        self.pixmap = self.imageToPixmap(self.field_image_selected)
+                        pixmap = QPixmap(self.pixmap)
+
+                        # Load the image
+                        self.ProcessImage.setPixmap(pixmap)
+                        self.ProcessImage.setScaledContents(True)
+
+                        # Cleanup
+                        self.field_image_selected = None
+
                     else:
                         print("Point is out of the bounds of the LUT.")
 
