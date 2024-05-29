@@ -51,7 +51,7 @@ class CameraWidget(QWidget):
         self.image_files = []
         self.current_image_index = -1  # Start with -1, so the first image is at index 0
 
-        # Object points for calibration
+        # Object points for calibration - read once from config -needs to be updated when rows or columns change
         self.objp = np.zeros((1, self.config.no_of_columns * self.config.no_of_rows, 3), np.float32)
         self.objp[0, :, :2] = np.mgrid[0:self.config.no_of_columns, 0:self.config.no_of_rows].T.reshape(-1, 2)
 
@@ -541,6 +541,16 @@ class CameraWidget(QWidget):
             self.load_next_image()
     
     def load_next_image(self):
+
+        # Read user-input values for columns, rows, and square size
+        self.no_of_columns = int(self.columnsInput.text())
+        self.no_of_rows = int(self.rowsInput.text())
+        self.square_size = float(self.squareSizeRow.text())
+
+        # Object points for calibration - re-read
+        self.objp = np.zeros((1, self.no_of_columns * self.no_of_rows, 3), np.float32)
+        self.objp[0, :, :2] = np.mgrid[0:self.no_of_columns, 0:self.no_of_rows].T.reshape(-1, 2)
+
         self.current_image_index += 1
         if self.current_image_index < len(self.image_files):
             # Print which image is being loaded and its index
@@ -575,6 +585,10 @@ class CameraWidget(QWidget):
             self.no_of_columns = int(self.columnsInput.text())
             self.no_of_rows = int(self.rowsInput.text())
             self.square_size = float(self.squareSizeRow.text())
+
+            # Object points for calibration - re-read
+            self.objp = np.zeros((1, self.no_of_columns * self.no_of_rows, 3), np.float32)
+            self.objp[0, :, :2] = np.mgrid[0:self.no_of_columns, 0:self.no_of_rows].T.reshape(-1, 2)
 
             # Start the timer when the button is clicked
             self.timer.start(100)  # Set the interval in milliseconds (e.g. 100 milliseconds)
@@ -785,6 +799,10 @@ class CameraWidget(QWidget):
         self.no_of_columns = int(self.columnsInput.text())
         self.no_of_rows = int(self.rowsInput.text())
         self.square_size = float(self.squareSizeRow.text())
+
+        # Object points for calibration - re-read
+        self.objp = np.zeros((1, self.no_of_columns * self.no_of_rows, 3), np.float32)
+        self.objp[0, :, :2] = np.mgrid[0:self.no_of_columns, 0:self.no_of_rows].T.reshape(-1, 2)
         
         if frame is None:
             raise ValueError("Frame is None")
@@ -913,7 +931,7 @@ class CameraWidget(QWidget):
         if ret:
             print("Corners detected successfully!")
             # Now Store Object Points 
-            self.object_points.append(self.objp)
+            self.object_points.append(self.objp) # Fixed
 
             ###################################### Blurring vs Gray ################################################################
             #-> refining on gray img for better results breaks the results!!!
@@ -1132,6 +1150,15 @@ class CameraWidget(QWidget):
         self.object_points = []  # 3D points in real world space
         self.image_points = []   # 2D points in image plane
 
+        # Read user-input values for columns, rows, and square size once
+        self.no_of_columns = int(self.columnsInput.text())
+        self.no_of_rows = int(self.rowsInput.text())
+        self.square_size = float(self.squareSizeRow.text())
+
+        # Object points for calibration - re-read
+        self.objp = np.zeros((1, self.no_of_columns * self.no_of_rows, 3), np.float32)
+        self.objp[0, :, :2] = np.mgrid[0:self.no_of_columns, 0:self.no_of_rows].T.reshape(-1, 2)
+
         # Now using tmp folder instead of input folder
         image_files = sorted(os.listdir(self.config.tmp_data))
         
@@ -1141,25 +1168,30 @@ class CameraWidget(QWidget):
                 frame = cv2.imread(file_path)
 
                 
-                ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
+                ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
 
                 if ret_corners:
 
                     # Display the x and y coordinates of each corner
-                    for i, corner in enumerate(corners):
-                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
+                    #for i, corner in enumerate(corners):
+                    #    x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
                         #print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
 
                     # TODO Collect the Corners to be saved to corners.vnl
 
-                    print("Calibration Succesfull")
+                    print("Corner Detection Succesfull")
 
         if len(self.object_points) >= self.config.min_cap:  # Ensure there's enough data for calibration
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+
             obj_points = np.array(self.object_points)
             img_points = np.array(self.image_points)
             #_img_shape = frame.shape[:2]
             _img_shape = frame.shape[:2][::-1]
+
+            # Print shapes of inputs
+            print(f"Object Points Shape: {obj_points.shape}")
+            print(f"Image Points Shape: {img_points.shape}")
             
             calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
 
@@ -1246,7 +1278,7 @@ class CameraWidget(QWidget):
             if file_name.startswith("corner_") and file_name.endswith(".png"):
                 file_path = os.path.join(self.config.tmp_data, file_name)
                 frame = cv2.imread(file_path)
-                ret_corners, corners, _ = self.detectCorners(frame, self.config.no_of_columns, self.config.no_of_rows)
+                ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
 
                 if ret_corners:
 
@@ -1426,15 +1458,6 @@ class CameraWidget(QWidget):
     def test_calibration(self):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
-
-        if self.camera_matrix is None:
-            raise ValueError("camera_matrix is None")
-        if self.camera_dist_coeff is None:
-            raise ValueError("camera_dist_coeff is None")
-
-        # Debug print for camera matrix and distortion coefficients
-        print(f"Using Camera Matrix:\n{self.camera_matrix}")
-        print(f"Using Distortion Coefficients:\n{self.camera_dist_coeff}")
 
         # Set test boolean to prevent mutiple saves (or 10 rows lower?)
         self.test_started = True
