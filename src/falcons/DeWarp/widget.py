@@ -72,7 +72,9 @@ class CameraWidget(QWidget):
         self.capture_started = False  # Track if caputure is started
         self.test_started = False  # Track if test is started
         self.cal_imported = False  # Track if imported calibration is used
+        self.cal_succesfull = False # Track if calibration succeeded
         self.cal_saved = False # Track if calibration is saved to file
+        self.lut_saved = False # Track if binairy LUT is saved to file
         self.image_dewarp = False  # Track if an image is used for dewarping
         self.video_dewarp = False  # Track if an USB camera is used for dewarping
         self.network_dewarp = False  # Track if an network stream is used for dewarping
@@ -565,7 +567,6 @@ class CameraWidget(QWidget):
             # Set guiding info in output window
             self.outputWindow.setText(f"Press Enter or space to load the next image")
 
-
         else:
             print("No more images in the directory.")
 
@@ -671,18 +672,6 @@ class CameraWidget(QWidget):
             undistorted_frame = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
             self.pixmap = self.imageToPixmap(undistorted_frame)
 
-            ##########################################
-
-            #self.cameraFrame.setFixedSize(self.pixmap.size())
-            # Get the width of cameraFrame
-            #cameraFrameWidth = self.cameraFrame.size().width()
-
-            # Set the buttons to the same width as cameraFrame
-            #self.doneButton1.setFixedWidth(cameraFrameWidth)
-            #self.captureButton1.setFixedWidth(cameraFrameWidth)
-
-            ##########################################
-
             # Use cameraFrame for tab1 and imageFrame for tab2
             if self.tabs.currentIndex() == 0:  # tab1 is at index 0
                 self.cameraFrame.setPixmap(self.pixmap)
@@ -745,12 +734,6 @@ class CameraWidget(QWidget):
                 # Print loaded camera matix
                 #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
 
-                #TODO Check self.camera.matrix and self.dist_coeff are available?
-
-                # Debug print for camera matrix and distortion coefficients
-                #print(f"Camera Matrix used for Testing:\n{self.camera_matrix}")
-                #print(f"Distortion Coefficients used for Testing:\n{self.camera_dist_coeff}")
-
                 # Camera input not fisheye TODO create fisheye toggle
                 if self.input_camera.isChecked():
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
@@ -791,8 +774,6 @@ class CameraWidget(QWidget):
             # Ensure the image does not scales with the label -> issue with aspect ratio TODO
             self.cameraFrame.setScaledContents(False)
             self.update()
-    
-    ############ NEW TODO #####################
 
     def process_pylon_frame(self, frame):
         # Read user-input values for columns, rows, and square size
@@ -826,7 +807,6 @@ class CameraWidget(QWidget):
         self.cv_image = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
         org_img = self.cv_image.copy()
 
-        #########################################################################
         # Undistort if test is started or calibration imported
         if self.test_started or self.cal_imported:
 
@@ -849,9 +829,6 @@ class CameraWidget(QWidget):
         
         else:
 
-        ###########################################################################
-
-            # Optionally to try downscaling image to run findchessboardcorners and use output corners as input on noral size image for FindCornerSubpix
             detection_start_time = time.time()
 
             ret_corners, corners, frame_with_corners = self.detectCorners(
@@ -909,16 +886,6 @@ class CameraWidget(QWidget):
         # Convert to gray for better edge detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # Apply Gaussian blur
-        #kernel_size = (3, 3)  # Kernel size can be (3,3), (5,5), (7,7) etc. depending on the level of blurring needed.
-        #sigma = 1  # Standard deviation of the kernel. Increasing this value leads to more blurring.
-
-        # Adding blurr reduces processing when no corners found from 5s to 2s or less
-        #blurred = cv2.GaussianBlur(gray, kernel_size, sigma)
-
-
-        # TODO only used blurred for Pylon Camera to speed up detection ?
-
         # Find the chess board corners. If desired number of corners are found in the image then ret = true
         #findchessboard_start_time = time.time()
         ret, corners = cv2.findChessboardCorners(
@@ -933,13 +900,8 @@ class CameraWidget(QWidget):
             # Now Store Object Points 
             self.object_points.append(self.objp) # Fixed
 
-            ###################################### Blurring vs Gray ################################################################
-            #-> refining on gray img for better results breaks the results!!!
-
             # Refining pixel coordinates for given 2d points. A larger search window means the algorithm considers a broader area around each corner for refining its location. 
             corners_refined = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria) #-> refining on gray img for better results breaks the results!!!
-
-            #######################################################################################################################
 
             ## Now Store Corners Detected
             #self.image_points.append(corners)
@@ -1046,6 +1008,9 @@ class CameraWidget(QWidget):
 
                     # TODO Collect the Corners to be saved to corners.vnl
 
+                    # Set succesfull calibration state
+                    self.cal_succesfull = True
+
                     print("Calibration Succesfull")
                 else:
                     print(f"No Corners Detected in {file_path}")
@@ -1055,23 +1020,6 @@ class CameraWidget(QWidget):
             print(f"Found {len(self.object_points)} images with corners detected")
             # Generate a timestamp for the screenshot filename
             timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-
-###########################################################################################################
-#  Dirty work a round for differences in image format 2 or 3 values
-
-            #ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-            #    self.object_points, self.image_points, frame.shape[::-1], None, None
-            #)
-
-            #if self.input_camera.isChecked() or self.input_pylon.isChecked():
-            #    # Perform camera calibration
-            #    ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-            #        self.object_points, self.image_points, (frame.shape[1], frame.shape[0]), None, None
-            #    )
-            #else:
-            #    ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
-            #        self.object_points, self.image_points, frame.shape[::-1], None, None
-            #    )
             
             # Using frame.shape[:2][::-1] should fix the issue
             ret, camera_matrix, distortion_coefficients, rvecs, tvecs = cv2.calibrateCamera(
@@ -1082,9 +1030,7 @@ class CameraWidget(QWidget):
 
             #frame.shape[1] gives the width of the frame.
             #frame.shape[::-1] gives the dimensions of the frame in reverse order.
-            #frame.shape[:2][::-1] gives the height and width of the frame in reverse order, excluding any additional dimensions like color channels.
-
-#########################################################################################################     
+            #frame.shape[:2][::-1] gives the height and width of the frame in reverse order, excluding any additional dimensions like color channels.  
 
             if ret:  # if calibration was successfully
                 # Display the calibration results
@@ -1218,6 +1164,9 @@ class CameraWidget(QWidget):
                 # Check if the Root Mean Square (RMS) error is below threshold                    
                 self.evaluate_calibration(rms)
 
+                # Set succesfull calibration state
+                self.cal_succesfull = True
+
                 self.outputWindow.setText(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
                 print(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
 
@@ -1260,108 +1209,6 @@ class CameraWidget(QWidget):
         else:
             print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
 
-
-    def perform_calibration_fisheye_old(self):
-        print(f"test_calibration is set to: {self.test_started}")
-        print("Start Calibration")
-        self.update_status_signal.emit("Calibration in progress...")
-
-        # At this stage object_points and image_points are alread available when detect_corners was ran for loading images / frames etc
-        # Clear self.object_points and self.image_points to detect again?
-        self.object_points = []  # 3D points in real world space
-        self.image_points = []   # 2D points in image plane
-
-        # Now using tmp folder instead of input folder
-        image_files = sorted(os.listdir(self.config.tmp_data))
-        
-        for file_name in image_files:
-            if file_name.startswith("corner_") and file_name.endswith(".png"):
-                file_path = os.path.join(self.config.tmp_data, file_name)
-                frame = cv2.imread(file_path)
-                ret_corners, corners, _ = self.detectCorners(frame, self.no_of_columns, self.no_of_rows)
-
-                if ret_corners:
-
-                    # Display the x and y coordinates of each corner
-                    for i, corner in enumerate(corners):
-                        x, y = corner.ravel() # Converts the corner's array to a flat array and then unpacks the x and y values
-                        #print(f"Found Corner {i+1}: x = {x}, y = {y} in {file_path}")
-
-                    # TODO Collect the Corners to be saved to corners.vnl
-
-                    print("Calibration Succesfull")
-
-        if len(self.object_points) >= self.config.min_cap:  # Ensure there's enough data for calibration
-            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-            obj_points = np.array(self.object_points)
-            img_points = np.array(self.image_points)
-            _img_shape = frame.shape[:2]
-            
-            calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND + cv2.fisheye.CALIB_FIX_SKEW
-            #calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_FIX_SKEW
-
-            N_OK = len(obj_points)
-            K = np.zeros((3, 3))
-            D = np.zeros((4, 1))
-            rvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
-            tvecs = [np.zeros((1, 1, 3), dtype=np.float64) for i in range(N_OK)]
-
-            try:
-                rms, K, D, rvecs, tvecs = cv2.fisheye.calibrate(
-                    obj_points,
-                    img_points,
-                    _img_shape[::-1],
-                    K,
-                    D,
-                    rvecs,
-                    tvecs,
-                    calibration_flags,
-                    (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
-                )
-
-                # Check if the Root Mean Square (RMS) error is below threshold                    
-                self.evaluate_calibration(rms)
-
-                self.outputWindow.setText(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
-                print(f"Camera matrix found:{K}\nDistortion coefficients found:{D}")
-
-                self.camera_matrix = K
-                self.camera_dist_coeff = D
-
-                # Save intrinsic parameters to intrinsic.txt
-                if self.test_started == True: # TODO Not triggered when set to False
-                    with open(f"{self.config.tmp_data}/intrinsic_{timestamp}.txt", "w") as file:
-                        file.write("Camera Matrix:\n")
-                        file.write(str(self.camera_matrix))
-                        file.write("\n\nDistortion Coefficients:\n")
-                        file.write(str(self.camera_dist_coeff))
-
-                    self.outputWindow.setText(f"Rotation Vectors:{rvecs}")
-                    print("\n Rotation Vectors:")
-                    print(rvecs)
-
-                    self.outputWindow.setText(f"Translation Vectors:{tvecs}")
-                    print("\n Translation Vectors:")
-                    print(tvecs)
-
-                    # Save extrinsic parameters to extrinsic.txt
-                    with open(f"{self.config.tmp_data}/extrinsic_{timestamp}.txt", "w") as file:
-                        for i in range(len(rvecs)):
-                            file.write(f"\n\nImage {i+1}:\n")
-                            file.write(f"Rotation Vector:\n{rvecs[i]}\n")
-                            file.write(f"Translation Vector:\n{tvecs[i]}")
-                    
-                    self.outputWindow.setText(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
-                    print(f"Calibration parameters saved to {self.config.tmp_data}/intrinsic_{timestamp}.txt and {self.config.tmp_data}/extrinsic_{timestamp}.txt.")
-
-
-            except cv2.error as e:
-                print(f"Calibration failed with error: {e}")
-
-        else:
-            print(f"Need at least {self.config.min_cap} images with corners for calibration. Only {len(self.object_points)} found")
-
-#########################################################################################
 
     def verify_rms_prev(self, rms):
         # Exceptional: RMS < 0.1
@@ -1445,15 +1292,12 @@ class CameraWidget(QWidget):
             self.timer.stop()
             raise ValueError(f"RMS is {rms}, indicating Poor calibration quality. Recalibration required.")
 
-##############################################################################################################
 
     def generate_object_points(self, columns, rows, square_size):
         objp = np.zeros((1, columns * rows, 3), np.float32)
         objp[0, :, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2) * square_size
         return objp
 
-    #######################################################################
-    # Issue when calibration is loaden from JSON TODO
 
     def test_calibration(self):
         # TODO if Pause button was pressed , camera stops !!!!
@@ -1541,13 +1385,10 @@ class CameraWidget(QWidget):
         if camera_matrix is None or distortion_coefficients is None:
             print("No camera matrix or distortion coefficient detected, showing original frame")
             return frame
-        
-#########################################################################################################
 
         DIM = self.calibrate_DIM # Usue when inporting calibration , then this is None TODO Also store DIM in Calibration JSON
         print(f"Frame Dimension (DIM) = {DIM}")
 
-########################################################################################################
         # Below working for pylon / cam (not for images)
         dim1 = frame.shape[:2][::-1]  #dim1 is the dimension of input image to un-distort
         # TODO : frame.shape[1] vs frame.shape[::-1] vs frame.shape[:2][::-1] 
@@ -1562,7 +1403,6 @@ class CameraWidget(QWidget):
 
         #h, w = frame.shape[:2]
         print(f"Frame Dimension input (dim1) = {dim1}")
-########################################################################################################
 
         if not dim2:
             dim2 = dim1 # Target dimension for the new camera matrix optimization
@@ -1688,17 +1528,26 @@ class CameraWidget(QWidget):
             self, "Open Image File", "", "Image Files (*.png *.jpg *.bmp);;All Files (*)", options=options
         )
         if file_name:
-            # Set image Dewarp to True
-            self.image_dewarp = True  # TODO Does not belong here
-
-            print(f"Calibration imported is: {self.cal_imported}")
+            
             print(f"Loading file_name type: {type(file_name)}, file_name value: {file_name}")
 
-            self.display_dewarped_image(file_name)
+            self.display_image(file_name)
 
     def start_pwarp(self):
         # Stop Camera -> also stopped after save
         #self.timer.stop() # Should not be here ! works for now since only images are used
+
+        if self.cal_imported == True:
+            # Set image Dewarp to True
+            self.image_dewarp = True  # TODO Does not belong here
+
+            print(f"Calibration imported is: {self.cal_imported}")
+
+        if self.cal_succesfull == True:
+            # Set image Dewarp to True
+            self.image_dewarp = True  # TODO Does not belong here
+
+            print(f"Calibration imported used: {self.cal_imported}")
 
         # Check if the pixmap is set on the Image Frane
         if self.imageFrame.pixmap() is not None:
@@ -1734,7 +1583,7 @@ class CameraWidget(QWidget):
                         # Perform dewarping
                         self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
 
-                        self.display_dewarped_frame(self.dewarped_frame)
+                        self.display_frame(self.dewarped_frame)
 
                         # Print stuff and update status bar
                         print("Dewarping process completed.")
@@ -1958,15 +1807,12 @@ class CameraWidget(QWidget):
         ###############################################################
         # Move to Testing LUT generated by save_prep_mat_binary
 
-        # For now Quit App
-        #self.startButtonPwarp.setText("DONE")
-        self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
-        self.startButtonPwarp.clicked.connect(
-            #self.close_application
-            self.verify_lut
-        )  # close when done
+        if self.lut_saved == True:
+            #self.startButtonPwarp.setText("DONE")
+            self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
+            self.startButtonPwarp.clicked.connect(self.verify_lut)  # close when done
 
-        ##############################################################
+#########################################################################################
 
     def verify_lut(self):
         print(f"Start Verify Lookup Table (LUT)")
@@ -1976,8 +1822,8 @@ class CameraWidget(QWidget):
         # OutPut x,y on field_image
 
         #Clear and Enable Frame again to load test frame
-        self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap
-        self.imageFrame.setEnabled(False)
+        #self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Maybe not best (keep current to test)
+        self.imageFrame.setEnabled(True)
 
         #self.startButtonPwarp.clicked.connect(self.start_pwarp)
 
@@ -2021,7 +1867,7 @@ class CameraWidget(QWidget):
             self.close_application
         ) 
 
-    ##########################################################################
+######################################################################################
 
     def draw_landmark(self, image, landmark, color):
         # Draw the landmark
@@ -2049,7 +1895,7 @@ class CameraWidget(QWidget):
         return image
 
     # Image loading for tab2 - image
-    def display_dewarped_frame(self, dewarped_frame):
+    def display_frame(self, dewarped_frame):
         # Display the dewarped image
         dewarped_pixmap = self.imageToPixmap(dewarped_frame)
         self.imageFrame.setPixmap(dewarped_pixmap)
@@ -2057,7 +1903,7 @@ class CameraWidget(QWidget):
 
         
     # Image file loading for tab2 - filename
-    def display_dewarped_image(self, file_name):
+    def display_image(self, file_name):
 
         print(f"Filename is: {file_name}")
 
@@ -2139,12 +1985,10 @@ class CameraWidget(QWidget):
                         print("Point is out of the bounds of the LUT.")
 
                 ####################################################################
-
                 # Draw Transformed points on soccer Field Image
                 #self.field_image_selected = self.draw_landmark_selected(
                 #    self.field_image.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
                 #)
-
                 ##################################################################
 
             else:
@@ -2311,7 +2155,7 @@ class CameraWidget(QWidget):
                                 self.dewarped_frame.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
                             )
 
-                        self.display_dewarped_frame(self.dewarped_frame)
+                        self.display_frame(self.dewarped_frame)
 
                         # Print stuff and update status bar
                         print("Dewarping process completed.")
@@ -2347,7 +2191,6 @@ class CameraWidget(QWidget):
         # Start de warp again for tuning
         self.start_pwarp()
 
-
     ####################### Binary file stuff WIP ###################
     
     def write_mat_binary(self, ofs, out_mat):
@@ -2363,23 +2206,45 @@ class CameraWidget(QWidget):
         ofs.write(cols.to_bytes(4, byteorder='little'))
         ofs.write(np.uint32(dtype).tobytes())
         ofs.write(out_mat.tobytes())
+
+        print(f"Binary LUT saved to {self.lut_filename}")
+        self.update_status_signal.emit(f"Binary LUT saved to {self.lut_filename}")
+
+        self.lut_saved = True # Track if calibration is saved to file
+
         return True
     
     def save_prep_mat_binary(self):
-        # Set Filename static for now TODO add date
+        # Set Filename static for now TODO add date and get from config
         filename = "mat.bin"
         self.lut_filename = filename
 
         # Get Shape of dewarped image
         img_shape = self.dewarped_frame.shape[:2] # Do we save everything ? Yes for now
 
+        print(f"Generating the binary LUT, please be patient!")
+        self.update_status_signal.emit(f"Generating the binary LUT, please be patient!")
+
         # Create the lookup table
         self.lut = self.warper.create_lookup_table(img_shape)
 
-        print(f"Saving to binary file {filename} and saving Mat image")
+        #return self.save_mat_binary(self.lut_filename, self.lut)
+        self.save_mat_binary(self.lut_filename, self.lut)
 
-        #return self.save_mat_binary(filename, mat)
-        return self.save_mat_binary(filename, self.lut)
+        ###############################################################
+        # Move to Testing LUT generated by save_prep_mat_binary
+        if self.lut_saved == True:
+
+            # First, disconnect all previously connected signals to avoid multiple connections.
+            try:
+                self.startButtonPwarp.clicked.disconnect()
+            except TypeError:
+                # If no connections exist, a TypeError is raised. Pass in this case.
+                pass
+
+            #self.startButtonPwarp.setText("DONE")
+            self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
+            self.startButtonPwarp.clicked.connect(self.verify_lut)  # close when done
 
     def save_mat_binary(self, filename, output):
         with open(filename, 'wb') as ofs:
@@ -2404,27 +2269,6 @@ class CameraWidget(QWidget):
             return tuple(lut[y, x])
         else:
             return None  # Out of bounds
-
-    ########### Below not used #############################################
-
-    def read_mat_binary(self, ifs, in_mat):
-        if not ifs:
-            return False
-        rows = int.from_bytes(ifs.read(4), byteorder='little')
-        if rows == 0:
-            return True
-        cols = int.from_bytes(ifs.read(4), byteorder='little')
-        dtype = np.dtype(int(np.uint32.frombytes(ifs.read(4), byteorder='little')))
-        in_mat.release()
-        in_mat.create(rows, cols, dtype)
-        in_mat.data = ifs.read(in_mat.elemSize() * in_mat.total())
-        return True
-
-    def load_mat_binary(self, filename, output):
-        with open(filename, 'rb') as ifs:
-            return self.read_mat_binary(ifs, output)
-        
-    ###################################################################################
 
     def close_application(self):
         QApplication.quit()
