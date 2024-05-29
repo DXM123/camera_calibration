@@ -64,13 +64,8 @@ Tested on Ubuntu 22.04 LTS (Should work on Ubuntu 20.04 LTS also)
 
 **Calibration Example:**
 
-![Screenshot from 2024-05-19 19-57-57](https://github.com/DXM123/camera_calibration/assets/19300348/a798e49d-dc7f-43ab-b824-32e661c66f84)
-
+![Screenshot from 2024-05-29 15-57-15](https://github.com/DXM123/camera_calibration/assets/19300348/e6422a04-a0d2-46eb-9560-6d0701247569)
 
 **Warp Example:**
 
 ![Screenshot from 2024-05-29 13-01-29](https://github.com/DXM123/camera_calibration/assets/19300348/36608af4-05b8-4228-ab7a-f63e573e59f3)
-
-
-
-
