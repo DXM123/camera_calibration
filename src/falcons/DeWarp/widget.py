@@ -74,6 +74,7 @@ class CameraWidget(QWidget):
         self.cal_imported = False  # Track if imported calibration is used
         self.cal_succesfull = False # Track if calibration succeeded
         self.cal_saved = False # Track if calibration is saved to file
+        self.lut_imported = False # Track if LUT binary is imported
         self.lut_saved = False # Track if binairy LUT is saved to file
         self.image_dewarp = False  # Track if an image is used for dewarping
         self.video_dewarp = False  # Track if an USB camera is used for dewarping
@@ -656,8 +657,8 @@ class CameraWidget(QWidget):
             # Save the frame as an image
             cv2.imwrite(filename, image)
 
-            # Camera input not fisheye TODO create fisheye toggle
-            if self.input_camera.isChecked():
+            # Camera input not fisheye TODO create fisheye toggle -> then can remove all static references to input and
+            if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
                 undistorted_frame = self.undistort_frame(image, self.camera_matrix, self.camera_dist_coeff)
             else:
                 undistorted_frame = self.undistort_fisheye_frame(image, self.camera_matrix, self.camera_dist_coeff)      
@@ -675,27 +676,33 @@ class CameraWidget(QWidget):
             # Use cameraFrame for tab1 and imageFrame for tab2
             if self.tabs.currentIndex() == 0:  # tab1 is at index 0
                 self.cameraFrame.setPixmap(self.pixmap)
+                print("Tab 1 active")
             elif self.tabs.currentIndex() == 1:  # tab2 is at index 1
                 self.imageFrame.setPixmap(self.pixmap)
+                print("Tab 2 active")
 
         else:
             print("No test started or calibration file loaded")
             #org_image = self.imageToPixmap(image)
-            ret_corners, corners, frame_with_corners = self.detectCorners(image, self.no_of_columns, self.no_of_rows)
 
-            if ret_corners:
-                # Display the image with corners
-                frame_with_corners = cv2.cvtColor(frame_with_corners, cv2.COLOR_BGR2RGB)
-                self.pixmap = self.imageToPixmap(frame_with_corners)
-                self.cameraFrame.setPixmap(self.pixmap)
-                # Only save when not testing
-                if self.test_started != True:
-                    self.save_screenshot(org_image)  # Save original Frame
+            if not self.lut_imported:
+                ret_corners, corners, frame_with_corners = self.detectCorners(image, self.no_of_columns, self.no_of_rows)
+
+                if ret_corners:
+                    # Display the image with corners
+                    frame_with_corners = cv2.cvtColor(frame_with_corners, cv2.COLOR_BGR2RGB)
+                    self.pixmap = self.imageToPixmap(frame_with_corners)
+                    self.cameraFrame.setPixmap(self.pixmap)
+                    # Only save when not testing
+                    if self.test_started != True:
+                        self.save_screenshot(org_image)  # Save original Frame
+                else:
+                    # Display the original image
+                    org_image = cv2.cvtColor(org_image, cv2.COLOR_BGR2RGB) 
+                    self.pixmap = self.imageToPixmap(org_image)
+                    self.cameraFrame.setPixmap(self.pixmap)
             else:
-                # Display the original image
-                org_image = cv2.cvtColor(org_image, cv2.COLOR_BGR2RGB) 
-                self.pixmap = self.imageToPixmap(org_image)
-                self.cameraFrame.setPixmap(self.pixmap)
+                self.verify_lut()
 
         # Ensure the image does not scales with the label -> issue with aspect ratio TODO
         self.cameraFrame.setScaledContents(False)
@@ -708,7 +715,7 @@ class CameraWidget(QWidget):
 
         # This method will be called at regular intervals by the timer
         # ret, frame = self.cap.read()
-        if self.input_camera.isChecked():
+        if self.input_camera.isChecked(): # or self.radio_video
             frame = self.cap.get()
             ret = True # Why set this static when video is added !
 
@@ -720,7 +727,7 @@ class CameraWidget(QWidget):
 
         if ret:  # if frame captured successfully
 
-            # TODO Only flip for internal CAM and not input video !!
+            # TODO Only flip for internal CAM and not input video !! -> What to do with radio_video
             if self.input_camera.isChecked() and not self.test_started:
                 frame_inverted = cv2.flip(frame, 1)  # flip frame horizontally --> Is this needed TODO -> Only for Camera , not for Video !!
             else:
@@ -735,7 +742,8 @@ class CameraWidget(QWidget):
                 #self.outputWindow.setText(f"Camera matrix used for testing:{self.camera_matrix}")
 
                 # Camera input not fisheye TODO create fisheye toggle
-                if self.input_camera.isChecked():
+                #if self.input_camera.isChecked():
+                if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
                     undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
@@ -817,7 +825,8 @@ class CameraWidget(QWidget):
                 raise ValueError("camera_dist_coeff is None")
 
             # Camera input not fisheye TODO create fisheye toggle
-            if self.input_camera.isChecked():
+            #if self.input_camera.isChecked():
+            if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
                 undistorted_frame = self.undistort_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)
             else:
                 undistorted_frame = self.undistort_fisheye_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)       
@@ -1298,7 +1307,7 @@ class CameraWidget(QWidget):
         objp[0, :, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2) * square_size
         return objp
 
-
+    # always in tab 1
     def test_calibration(self):
         # TODO if Pause button was pressed , camera stops !!!!
         print("Testing Calibration")
@@ -1312,7 +1321,7 @@ class CameraWidget(QWidget):
                 self.perform_calibration_fisheye()
                 #self.perform_calibration()
                 self.current_image_index = -1
-                self.load_next_image() 
+                self.load_next_image() #
 
         if self.input_camera.isChecked():
             if not self.cal_imported:
@@ -1563,7 +1572,8 @@ class CameraWidget(QWidget):
                 frame = self.cv_image
 
                 # Camera input not fisheye TODO create fisheye toggle
-                if self.input_camera.isChecked():
+                if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
+                #if self.input_camera.isChecked():
                     undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                 else:
                     undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
@@ -1821,36 +1831,61 @@ class CameraWidget(QWidget):
         # Input Mouse Clicks x,y on imageFrame
         # OutPut x,y on field_image
 
-        #Clear and Enable Frame again to load test frame
-        #self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Maybe not best (keep current to test)
-        self.imageFrame.setEnabled(True) # Enable ImageFrame again
+        # Stop mouse and key press event registration
+        # self.imageFrame.mousePressEvent = None
+        self.imageFrame.keyPressEvent = None
 
-        try:
-            self.loadImage.clicked.disconnect()
-        except TypeError:
-            # If no connections exist, a TypeError is raised. Pass in this case.
-            pass
+        ######################################
 
-        self.loadImage.setEnabled(True)
-        self.loadImage.setText("Load Test Image")
-        self.loadImage.clicked.connect(self.load_image)
+        # Previous frame (dewarped) showing
+        # Needs to show original frame before calibration (no undistort)
+        # Do we load a fresh image like below or use previous from image index still save (needs a click now)
+
+        # Set toggle to false to prevent undistort image
+        self.test_started = False
+        self.cal_imported = False
 
         # Only load LUT once during start
         if not self.verify_lut_started:
+            print("LUT verification not started. Initializing LUT...")
             ### Could also load lut like:
             #self.lut = None # Clear if needed
             if self.lut is None:
+                print("LUT is None. Loading LUT from binary file...")
                 #Load LUT 
                 self.lut = self.load_lut_from_binary(self.lut_filename)
+                print(f"LUT loaded successfully from {self.lut_filename}")
+                
+                # now must be mat.bin in root TODO add way to load it like calibration in 3e tab?
+                # Not supported now to load a previous generated LUT
 
             # Set LUT verify as Started
             self.verify_lut_started = True
+            print("LUT verification started.")
+        else:
+            print("LUT verification already started. Skipping initialization.")
 
-        ## Get Mouse Click Event to provide to query lut
-        self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
-        ### And query like:
-        #transformed_point = self.query_lut(lut, x, y)
+        #Clear and Enable Frame again to load test frame
+        ###self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Maybe not best (keep current to test) TODO
+        self.imageFrame.setEnabled(True) # Enable ImageFrame again
+
+        if self.imageFrame.pixmap() is None:
+            print(f"Load an image, click once?")
+            self.processoutputWindow.setText(f"Click once to load the image and use mouse clicks to test coordinates")
+        else:
+            ## Get Mouse Click Event to provide to query lut
+            self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
+
+        #try:
+        #    self.loadImage.clicked.disconnect()
+        #except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+        #    pass
+
+        #self.loadImage.setEnabled(True)
+        #self.loadImage.setText("Load Test Image")
+        #self.loadImage.clicked.connect(self.load_image) # TODO this stops registering mousePressEvent
 
         # First, disconnect all previously connected signals to avoid multiple connections.
         try:
@@ -1962,13 +1997,19 @@ class CameraWidget(QWidget):
 
                 frame = self.cv_image
 
-                # Camera input not fisheye TODO create fisheye toggle
-                if self.input_camera.isChecked():
-                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-                else:
-                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                if self.test_started or self.cal_imported:
 
-                undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+                    # Camera input not fisheye TODO create fisheye toggle
+                    #if self.input_camera.isChecked():
+                    if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
+                        undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    else:
+                        undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+
+                    undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+                else:
+                    # TODO Update name
+                    undistorted_frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
                 bgimage = cv2.rectangle(undistorted_frame_rgb, (x, y), (x + 2, y + 2), (SoccerFieldColors.Green.value), 2)
                 self.display_landmarks(bgimage)
@@ -2142,53 +2183,63 @@ class CameraWidget(QWidget):
             # Make rectangle red when selected
             print(f"Updating perspective transform, using: self.points (pts{self.selected_point}): {self.points}")
 
-            # Check if the pixmap is set on the Image Frane
-            if self.imageFrame.pixmap() is not None:
-                print("Update Image Frame / PWarp view")
+            #When validating LUT , no undistort
+            if self.test_started or self.cal_imported:
 
-                # Debug print for camera matrix and distortion coefficients
-                print(f"Camera Matrix:\n{self.camera_matrix}")
-                print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
+                # Check if the pixmap is set on the Image Frane
+                if self.imageFrame.pixmap() is not None:
+                    print("Update Image Frame / PWarp view")
 
-                frame = self.cv_image
+                    # Debug print for camera matrix and distortion coefficients
+                    print(f"Camera Matrix:\n{self.camera_matrix}")
+                    print(f"Distortion Coefficients:\n{self.camera_dist_coeff}")
 
-                # Camera input not fisheye TODO create fisheye toggle
-                if self.input_camera.isChecked():
-                    undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    frame = self.cv_image
+
+                    # Camera input not fisheye TODO create fisheye toggle
+                    #if self.input_camera.isChecked():
+                    if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two only has images
+                        undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+                    else:
+                        undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
+
+                    undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
+                    self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
+
+                    # Check if 'frame' is a valid NumPy array
+                    if isinstance(frame, np.ndarray):
+                        
+                        # Disable Load image Button when import succeeded and dewarp started
+                        self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
+
+                        if len(frame.shape) == 3:  # Verify if valid frame shape
+
+                            self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                        
+
+                            # Perform dewarping
+                            self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
+
+                            # Add functionality while tuning
+                            if self.image_tuning_dewarp == True:
+                                # Draw selector on dewarped frame
+                                self.dewarped_frame = self.draw_landmark_selected(
+                                    self.dewarped_frame.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
+                                )
+
+                            self.display_frame(self.dewarped_frame)
+
+                            # Print stuff and update status bar
+                            print("Dewarping process completed.")
+                            self.processoutputWindow.setText("Dewarping process completed.")
+                            self.update_status_signal.emit("Dewarping process completed.")
+
                 else:
-                    undistorted_frame = self.undistort_fisheye_frame(frame, self.camera_matrix, self.camera_dist_coeff)
-
-                undistorted_frame_rgb = cv2.cvtColor(undistorted_frame, cv2.COLOR_BGR2RGB)
-                self.pixmap = self.imageToPixmap(undistorted_frame_rgb)
-
-                # Check if 'frame' is a valid NumPy array
-                if isinstance(frame, np.ndarray):
-                    
-                    # Disable Load image Button when import succeeded and dewarp started
-                    self.loadImage.setDisabled(True)  # LoadImage / load_image is confusing TODO
-
-                    if len(frame.shape) == 3:  # Verify if valid frame shape
-
-                        self.warper_result = self.dewarp(undistorted_frame_rgb)  # return warper                        
-
-                        # Perform dewarping
-                        self.dewarped_frame = self.warper_result.warp(undistorted_frame_rgb.copy(),self.field_image.copy())
-
-                        # Add functionality while tuning
-                        if self.image_tuning_dewarp == True:
-                            # Draw selector on dewarped frame
-                            self.dewarped_frame = self.draw_landmark_selected(
-                                self.dewarped_frame.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
-                            )
-
-                        self.display_frame(self.dewarped_frame)
-
-                        # Print stuff and update status bar
-                        print("Dewarping process completed.")
-                        self.update_status_signal.emit("Dewarping process completed.")
-
+                    print("Pixmap is not set")
             else:
-                print("Pixmap is not set")
+                frame = self.cv_image
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                self.pixmap = self.imageToPixmap(frame_rgb)
+
 
     def adjust_point(self, point, direction):
         """Adjust the point based on arrow key input"""
@@ -2234,6 +2285,7 @@ class CameraWidget(QWidget):
         ofs.write(out_mat.tobytes())
 
         print(f"Binary LUT saved to {self.lut_filename}")
+        self.processoutputWindow.setText(f"Binary LUT saved to {self.lut_filename}")
         self.update_status_signal.emit(f"Binary LUT saved to {self.lut_filename}")
 
         self.lut_saved = True # Track if calibration is saved to file
@@ -2249,13 +2301,19 @@ class CameraWidget(QWidget):
         img_shape = self.dewarped_frame.shape[:2] # Do we save everything ? Yes for now
 
         print(f"Generating the binary LUT, please be patient!")
+
+        #Below is not beeing displayed !!!
+        self.processoutputWindow.setText(f"Generating the binary LUT, please be patient!")
         self.update_status_signal.emit(f"Generating the binary LUT, please be patient!")
+
+        self.startButtonPwarp.setEnabled(False)
 
         # Create the lookup table
         self.lut = self.warper.create_lookup_table(img_shape)
 
         #return self.save_mat_binary(self.lut_filename, self.lut)
         self.save_mat_binary(self.lut_filename, self.lut)
+
 
         ###############################################################
         # Move to Testing LUT generated by save_prep_mat_binary
@@ -2269,6 +2327,7 @@ class CameraWidget(QWidget):
                 pass
 
             #self.startButtonPwarp.setText("DONE")
+            self.startButtonPwarp.setEnabled(True)
             self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
             self.startButtonPwarp.clicked.connect(self.verify_lut)  # close when done
 
@@ -2286,6 +2345,14 @@ class CameraWidget(QWidget):
             # Assuming the LUT was saved as float32 for both x' and y' values
             dtype = np.float32
             lut = np.frombuffer(file.read(), dtype=dtype).reshape((rows, cols, 2))
+
+            print(f"LUT binary {filename} loaded")
+
+            # Emit the signal with the updated status text
+            self.update_status_signal.emit(f"LUT binary {filename} loaded")
+
+            # Set guiding info in output window
+            self.outputWindow.setText(f"LUT binary {filename} loaded")
             
         return lut
 

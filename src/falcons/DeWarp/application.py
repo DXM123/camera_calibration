@@ -51,6 +51,11 @@ class CamCalMain(QMainWindow):
         import_calibration.triggered.connect(self.load_calibration)
         file_menu.addAction(import_calibration)
 
+        # Add actions to the File menu to import LUT binary
+        import_lut = QAction("Import LUT", self)  # Load LUT binary file?
+        import_lut.triggered.connect(self.load_lut)
+        file_menu.addAction(import_lut)
+
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)  # of use close application function ??
         exit_action.setShortcut("Ctrl+D")
@@ -63,6 +68,45 @@ class CamCalMain(QMainWindow):
         # Connect the signal to the slot for updating the status bar
         self.camera_widget.update_status_signal.connect(self.update_status_bar)
 
+    def load_lut(self, filename):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        # TODO open folder to load JSON (take from args)
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Select LUT binary File", "", "BIN Files (*.bin);;All Files (*)", options=options
+        )
+
+        if file_name:
+            try:
+                with open(file_name, "r") as f:
+                    self.camera_widget.lut = self.camera_widget.load_lut_from_binary(file_name)
+                    self.camera_widget.lut_imported = True
+
+
+                # First, disconnect all previously connected signals to avoid multiple connections.
+                try:
+                    self.camera_widget.startButtonPwarp.clicked.disconnect()
+                except TypeError:
+                    # If no connections exist, a TypeError is raised. Pass in this case.
+                    pass
+
+                #Move to verify LUT when manually imported
+                self.camera_widget.startButtonPwarp.setEnabled(True)
+                self.camera_widget.startButtonPwarp.setText("Verify Lookup Table (LUT)")
+                self.camera_widget.startButtonPwarp.clicked.connect(self.camera_widget.verify_lut)  # close when done
+
+                #Switch to tab2 TODO
+
+
+            except FileNotFoundError:
+                print(f"File {filename} not found.")
+                self.camera_widget.update_status_signal.emit(f"File not found: {file_name}")
+
+            except Exception as e:
+                print(f"Error loading calibration file: {e}")
+                self.camera_widget.update_status_signal.emit("Error loading calibration file")
+
 
     def load_calibration(self, filename):
         options = QFileDialog.Options()
@@ -70,7 +114,7 @@ class CamCalMain(QMainWindow):
 
         # TODO open folder to load JSON (take from args)
         file_name, _ = QFileDialog.getOpenFileName(
-            self, "Open Calibration File", "", "JSON Files (*.json);;All Files (*)", options=options
+            self, "Select Calibration File", "", "JSON Files (*.json);;All Files (*)", options=options
         )
 
         if file_name:
@@ -108,8 +152,8 @@ class CamCalMain(QMainWindow):
 
                     # Add logic to distinct loading in tab 1 or tab 2 TODO
 
-                    # Disable Capture Button when import succeeded
-                    self.camera_widget.captureButton1.setDisabled(True)
+                    # Disable Capture Button when import succeeded -> only when pixmap or images loaded TODO
+                    #self.camera_widget.captureButton1.setDisabled(True)
 
                     # Start Camera when selected -> but is selected by default -> set image as default?
                     #if self.camera_widget.input_camera.isChecked():
