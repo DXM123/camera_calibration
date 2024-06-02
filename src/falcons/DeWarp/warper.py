@@ -110,21 +110,6 @@ class Warper(object):
     
     ################################ TEST LUT ##############################
 
-    def transform_point(self, x, y):
-        Hv = self.Hv
-        # Create the homogeneous coordinate of the point
-        point = np.array([x, y, 1])
-        
-        # Apply the transformation
-        transformed_point = np.dot(Hv, point)
-        
-        # Normalize if the last component is not 1
-        if transformed_point[2] != 0:
-            transformed_point /= transformed_point[2]
-        
-        #return transformed_point
-        return transformed_point[:2]
-
     def undistort_point(self, x, y):
         # Print the distortion coefficients and camera matrix
         #print("Distortion Coefficients:", self.D)
@@ -135,10 +120,42 @@ class Warper(object):
         distorted = np.array([[[x, y]]], dtype=np.float32)
         #print("Distorted Point:", distorted)
 
+        # This needs an Update TODO (see: undistort_fisheye_frame)
+
+        ################################################ Step 1 ###########################################################
+        # std::vector<cv::Point2f> pointsUnwarped;
+        # cv::fisheye::undistortPoints(inputPoints, pointsUnwarped, _calData.K, _calData.D, cv::Matx33d::eye(), _calData.K);
+        ###################################################################################################################
+
         undistorted = cv2.fisheye.undistortPoints(distorted, self.K, self.D, P=self.K)
         #print("Undistorted Point:", undistorted[0,0])
 
         return undistorted[0,0]
+
+    ########################### Step 2 ########################################
+    #std::vector<cv::Point2f> pointsResult;
+    #perspectiveTransform(pointsUnwarped, pointsResult, _calData.Hf);
+    ###########################################################################
+    
+    def transform_point(self, x, y):
+        Hv = self.Hv 
+
+        #if self.Hv is not None:
+        #    print("Homography Matrix (Hv) used for LUT:")
+        #    print(self.Hv)
+        #else:
+        #    print("Homography Matrix (Hv) is not set.")
+
+        # Create the point in the format expected by perspectiveTransform
+        point = np.array([[[x, y]]], dtype=np.float32)
+        
+        # Apply the transformation using perspectiveTransform
+        transformed_point = cv2.perspectiveTransform(point, Hv)
+        
+        # The result is a list of points; extract the first (and only) point
+        transformed_x, transformed_y = transformed_point[0][0]
+        
+        return transformed_x, transformed_y
 
     def create_lookup_table(self, img_shape):
         height, width = img_shape

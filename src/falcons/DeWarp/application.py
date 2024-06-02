@@ -97,6 +97,24 @@ class CamCalMain(QMainWindow):
                 self.camera_widget.startButtonPwarp.clicked.connect(self.camera_widget.verify_lut)  # close when done
 
                 #Switch to tab2 TODO
+                # Disable the first tab (Camera Calibration)
+                self.camera_widget.tabs.setTabEnabled(0, False) # Should not be here !
+
+                # Switch to the second tab (Perspective-Warp to test LUT)
+                self.camera_widget.tabs.setCurrentIndex(1)
+
+                # Dont need this is 2e tab
+                try:
+                    self.camera_widget.captureButton1.clicked.disconnect()
+                except TypeError:
+                    # If no connections exist, a TypeError is raised. Pass in this case.
+                    pass
+
+                if self.camera_widget.imageFrame.pixmap() is None:
+                    print("No Image Loaded")
+                    self.camera_widget.outputWindow.setText("No Image loaded")
+                    QMessageBox.question(
+                        self, "Warning!", f"No Image detected.\n\nPlease make sure an Image is loaded", QMessageBox.Ok)
 
 
             except FileNotFoundError:
