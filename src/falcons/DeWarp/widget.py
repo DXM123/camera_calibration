@@ -685,7 +685,7 @@ class CameraWidget(QWidget):
             print("No test started or calibration file loaded")
             #org_image = self.imageToPixmap(image)
 
-            if not self.lut_imported:
+            if not self.lut_imported and not self.verify_lut_started:
                 ret_corners, corners, frame_with_corners = self.detectCorners(image, self.no_of_columns, self.no_of_rows)
 
                 if ret_corners:
@@ -1768,13 +1768,18 @@ class CameraWidget(QWidget):
                 # Stop mouse press event registration
                 #self.imageFrame.mousePressEvent = None
 
-                if not self.image_tuning_dewarp == True:
-                    
+                if not self.image_tuning_dewarp ==True and not self.verify_lut_started:
                     # Stop mouse press event registration
+                    print("Disabeling mouse input on image Frame")
                     self.imageFrame.mousePressEvent = None
+                    self.imageFrame.releaseMouse()
                     # self.imageFrame.keyPressEvent = None
+                elif self.verify_lut_started:
+                    print("Enabeling mouse input on image Frame")
+                    self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
-                if self.image_tuning_dewarp == True:
+
+                if self.image_tuning_dewarp:
 
                     self.startButtonPwarp.setText("Click when done tuning")   ## Not updating TODO
                     self.startButtonPwarp.clicked.connect(self.stop_tuning)
@@ -1856,8 +1861,8 @@ class CameraWidget(QWidget):
 
         # Stop mouse and key press event registration
         # self.imageFrame.mousePressEvent = None
-        #self.imageFrame.keyPressEvent = None
-        #self.imageFrame.releaseKeyboard()
+        self.imageFrame.keyPressEvent = None
+        self.imageFrame.releaseKeyboard()
 
         #try:
         #    self.imageFrame.keyPressEvent = None
@@ -1876,13 +1881,14 @@ class CameraWidget(QWidget):
         # Needs to show original frame before calibration (no undistort)
         # Do we load a fresh image like below or use previous from image index still save (needs a click now)
 
-        # Set toggle to false to prevent undistort image
-        self.test_started = False
-        self.cal_imported = False
+        # Set toggle to false to prevent undistort image -> but verify works ok on undistorted image ??
+        #self.test_started = False
+        #self.cal_imported = False
 
         # Clear Image from self.imageFrame
         #self.cameraFrame.setPixmap(QPixmap())
-        #self.imageFrame.setPixmap(QPixmap()) 
+        #self.imageFrame.setPixmap(QPixmap())
+
 
         # Only load LUT once during start
         if not self.verify_lut_started:
@@ -1901,12 +1907,14 @@ class CameraWidget(QWidget):
             # Set LUT verify as Started
             self.verify_lut_started = True
             print("LUT verification started.")
-            self.imageFrame.setEnabled(True) # Enable ImageFrame again
+            #self.imageFrame.setEnabled(True) # Enable ImageFrame again
             #self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
             self.verify_lut()
             print ("Verify LUT")
         else:
             print("LUT verification already started. Skipping initialization.")
+            self.imageFrame.setEnabled(True) # Enable ImageFrame again
+            print("Enabeling mouse input on image Frame")
             self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
 
@@ -2414,7 +2422,7 @@ class CameraWidget(QWidget):
             
         return lut
 
-    def query_lut(sel, lut, x, y):
+    def query_lut(self, lut, x, y):
 
         if 0 <= y < lut.shape[0] and 0 <= x < lut.shape[1]:
             return tuple(lut[y, x])

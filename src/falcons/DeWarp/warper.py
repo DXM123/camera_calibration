@@ -172,4 +172,8 @@ class Warper(object):
                 x_prime, y_prime = self.transform_point(x_corr, y_corr)
                 lut[y, x] = [x_prime, y_prime]
 
+                # Debugging: Print some points to verify
+                if (x % 100 == 0) and (y % 100 == 0):
+                    print(f"Original: ({x}, {y}), Corrected: ({x_corr}, {y_corr}), Transformed: ({x_prime}, {y_prime})")
+
         return lut

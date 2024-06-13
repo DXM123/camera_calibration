@@ -12,8 +12,8 @@ def run(args):
     app = QApplication([])
     ex = CamCalMain(args.input)
     # configure based on given arguments (typically coming from argparse)
-    if not os.path.isdir(args.folder):
-        raise Exception(f'calibration folder not found: {args.folder}')
+    #if not os.path.isdir(args.folder):
+    #    raise Exception(f'calibration folder not found: {args.folder}')
     ex.output_folder = args.folder
     # run
     ex.show()
