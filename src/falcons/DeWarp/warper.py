@@ -130,7 +130,11 @@ class Warper(object):
         undistorted = cv2.fisheye.undistortPoints(distorted, self.K, self.D, P=self.K)
         #print("Undistorted Point:", undistorted[0,0])
 
-        return undistorted[0,0]
+        undistorted_point = undistorted[0,0]
+        
+
+        #return undistorted[0,0]
+        return undistorted_point
 
     ########################### Step 2 ########################################
     #std::vector<cv::Point2f> pointsResult;
@@ -154,7 +158,7 @@ class Warper(object):
         
         # The result is a list of points; extract the first (and only) point
         transformed_x, transformed_y = transformed_point[0][0]
-        
+
         return transformed_x, transformed_y
 
     def create_lookup_table(self, img_shape):
