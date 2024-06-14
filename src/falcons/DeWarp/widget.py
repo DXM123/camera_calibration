@@ -1376,14 +1376,14 @@ class CameraWidget(QWidget):
 
             # Optimize Matrix
             #h, w = frame.shape[:2]
-            #dim = frame.shape[:2][::-1]
+            dim = frame.shape[:2][::-1]
 
             #new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, (w, h), 1, (w, h))
-            #new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, dim, 1, dim)
+            new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, dim, 1, dim)
 
             # Undistort the frame using the camera matrix and distortion coefficients
-            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
-            #undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients, None, new_camera_matrix)
+            #undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients)
+            undistorted_frame = cv2.undistort(frame, camera_matrix, distortion_coefficients, None, new_camera_matrix)
 
             return undistorted_frame
 
@@ -1394,7 +1394,7 @@ class CameraWidget(QWidget):
         
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
 
-    # Play with Balance / ROI ! What is required for landmark selection !!! balance=0 is ROI vs balance=1 whole picture undistorted, or 0.8 :)
+    # Play with Balance / ROI ! What is required for landmark selection !!! balance=0 is ROI vs balance=1 whole picture undistorted, or 0.8 for original :)
 
     def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0, dim2=None, dim3=None):
 
@@ -1878,36 +1878,23 @@ class CameraWidget(QWidget):
         # Input Mouse Clicks x,y on imageFrame
         # OutPut x,y on field_image
 
-        # Stop mouse and key press event registration
-        # self.imageFrame.mousePressEvent = None
-        self.imageFrame.keyPressEvent = None
-        self.imageFrame.releaseKeyboard()
-
-        #try:
-        #    self.imageFrame.keyPressEvent = None
-        #    self.imageFrame.mousePressEvent = None
-        #    self.imageFrame.releaseKeyboard()
-        #    self.imageFrame.releaseMouse()
-        #    self.releaseKeyboard()
-        #    self.releaseMouse()
-        #except TypeError:
-        #    # If no connections exist, a TypeError is raised. Pass in this case.
-        #    pass
+        try:
+            # Stop mouse and key press event registration
+            # self.imageFrame.mousePressEvent = None
+            self.imageFrame.keyPressEvent = None
+            self.imageFrame.releaseKeyboard()
+            self.releaseKeyboard()
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
 
         ######################################
 
-        # Previous frame (dewarped) showing
-        # Needs to show original frame before calibration (no undistort)
-        # Do we load a fresh image like below or use previous from image index still save (needs a click now)
-
         # Set toggle to false to prevent undistort image -> but verify works ok on undistorted image ??
-        self.test_started = False
-        self.cal_imported = False
+        #self.test_started = False
+        #self.cal_imported = False
 
-        # Clear Image from self.imageFrame
-        #self.cameraFrame.setPixmap(QPixmap())
-        #self.imageFrame.setPixmap(QPixmap())
-
+        #######################################
 
         # Only load LUT once during start
         if not self.verify_lut_started:
@@ -1933,34 +1920,13 @@ class CameraWidget(QWidget):
         else:
             print("LUT verification already started. Skipping initialization.")
             self.imageFrame.setEnabled(True) # Enable ImageFrame again
+            #self.loadImage.setEnabled(True) # Enable load image
             print("Enabeling mouse input on image Frame")
+
+            # Enable mouse click events
             self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
-
-        #Clear and Enable Frame again to load test frame
-        ###self.imageFrame.setPixmap(QPixmap())  # Clear the current pixmap -> Maybe not best (keep current to test) TODO
-        #self.imageFrame.setEnabled(True) # Enable ImageFrame again
-
-        # Enable load image
-        self.loadImage.setEnabled(True)
-
-        #if self.imageFrame.pixmap() is None:
-        #    print(f"Load an image")
-        #    self.outputWindow.setText(f"Load an image")
-        #    self.loadImage.setEnabled(True)
-        #else:
-            ## Get Mouse Click Event to provide to query lut
-        #    self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
-
-        #try:
-        #    self.loadImage.clicked.disconnect()
-        #except TypeError:
-            # If no connections exist, a TypeError is raised. Pass in this case.
-        #    pass
-
-        #self.loadImage.setEnabled(True)
-        #self.loadImage.setText("Load Test Image")
-        #self.loadImage.clicked.connect(self.load_image) # TODO this stops registering mousePressEvent
+        self.loadImage.setEnabled(True) # Enable load image
 
         # First, disconnect all previously connected signals to avoid multiple connections.
         try:
@@ -2377,12 +2343,13 @@ class CameraWidget(QWidget):
         print(f"Shape of dewarped image: {img_shape}")
 
         # Get Shape of src image
-        src_img = (self.warper.src_height, self.warper.src_width)
+        #src_img = (self.warper.src_height, self.warper.src_width)
         print(f"Source image dimensions: Height = {self.warper.src_height}, Width = {self.warper.src_width}")
 
-        # Assign src_img as the new img_shape
-        img_shape = src_img
-        print(f"New image shape: {img_shape}")
+        # Assign src_img as the new img_shape -> to make smaller LUT?
+        #img_shape = src_img
+
+        print(f"LUT shape: {img_shape}")
 
         print(f"Generating the binary LUT, please be patient!")
 
