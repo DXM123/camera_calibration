@@ -114,6 +114,7 @@ class CameraWidget(QWidget):
 
         # Initialize camera_matrix as None
         self.camera_matrix = None
+        self.new_K = None
 
         # Initialize camera_distortion coefficients as None
         self.camera_dist_coeff = None
@@ -315,7 +316,7 @@ class CameraWidget(QWidget):
         self.imageFrame.setFrameShape(QFrame.Box)
 
         # Set focus on ImageFrame to receive key events -> Is this working? TODO
-        self.imageFrame.setFocusPolicy(Qt.StrongFocus)
+        #self.imageFrame.setFocusPolicy(Qt.StrongFocus)
         self.tab2inner.layout.addWidget(self.imageFrame)
 
         # Store the initial size for later use
@@ -722,8 +723,7 @@ class CameraWidget(QWidget):
 
     def update_camera_feed(self):
         # This method will be called at regular intervals by the timer
-        # - self.cap.read() instead of .get()       #
-        #############################################
+        # - self.cap.read() instead of .get()
 
         # This method will be called at regular intervals by the timer
         # ret, frame = self.cap.read()
@@ -811,11 +811,7 @@ class CameraWidget(QWidget):
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Capture in progess...")
 
-        # Get CV Image from frame (pylon already provides opencv format)
-
-        # Rescale image here from 1600 x 1216 (from Pylon) to 800 x 608
         # Get the dimensions of the original image
-        #original_height, original_width = self.cv_image.shape[:2]
         original_height, original_width = frame.shape[:2]
 
         # Calculate the new dimensions (half of the original dimensions)
@@ -837,7 +833,6 @@ class CameraWidget(QWidget):
                 raise ValueError("camera_dist_coeff is None")
 
             # Camera input not fisheye TODO create fisheye toggle
-            #if self.input_camera.isChecked():
             if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
                 undistorted_frame = self.undistort_frame(self.cv_image, self.camera_matrix, self.camera_dist_coeff)
             else:
@@ -884,7 +879,6 @@ class CameraWidget(QWidget):
             self.pixmap = self.CameraToPixmap(img)
             self.cameraFrame.setPixmap(self.pixmap)
 
-    ######################################
 
     def update_countdown(self):
         if self.countdown_seconds > 0:
@@ -1378,7 +1372,6 @@ class CameraWidget(QWidget):
             #h, w = frame.shape[:2]
             dim = frame.shape[:2][::-1]
 
-            #new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, (w, h), 1, (w, h))
             new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, distortion_coefficients, dim, 1, dim)
 
             # Undistort the frame using the camera matrix and distortion coefficients
@@ -1437,8 +1430,8 @@ class CameraWidget(QWidget):
         scaled_K[2][2] = 1.0  # Except that K[2][2] is always 1.0
 
         # Now, estimate the new camera matrix optimized for dim2 dimensions
-        # Need dim2 (balance=0) to get original undistorted frame withour extra's
         new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, distortion_coefficients, dim2, np.eye(3), balance=balance)
+        self.new_K = new_K
         
         #print(f"Original Camera Matrix:\n{camera_matrix}")
         #print(f"New Camera Matrix:\n{new_K}")
@@ -1450,27 +1443,6 @@ class CameraWidget(QWidget):
         undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT) # verify interpolation
 
         return undistorted_frame
-
-        
-    # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
-    def undistort_fisheye_frame_basic(self, frame, camera_matrix, distortion_coefficients):
-        # Check if camera_matrix and distortion_coefficients are available
-        if camera_matrix is not None and distortion_coefficients is not None:
-
-            # Store Frame Dimension
-            DIM = frame.shape[:2][::-1]  # Original image dimensions
-            print(f"Frame Dimension (DIM) = {DIM}")
-
-            #new_camera_matrix = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(camera_matrix, distortion_coefficients, DIM, np.eye(3), balance=1)
-
-            # Undistort and remap frame
-            map1, map2 = cv2.fisheye.initUndistortRectifyMap(camera_matrix, distortion_coefficients, np.eye(3), camera_matrix, DIM, cv2.CV_32FC1) # cv2.CV_16SC2
-            undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-
-            return undistorted_frame
-        else:
-            print("No camera matrix or distortion coefficient detected, showing original frame")
-            return frame
 
 
     def save_calibration(self):
@@ -1792,7 +1764,6 @@ class CameraWidget(QWidget):
                     print("Enabeling mouse input on image Frame")
                     self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
-
                 if self.image_tuning_dewarp:
 
                     self.startButtonPwarp.setText("Click when done tuning")   ## Not updating TODO
@@ -1819,6 +1790,7 @@ class CameraWidget(QWidget):
             width=img.shape[1],
             height=img.shape[0],
             matrix=self.camera_matrix,
+            new_matrix=self.new_K,
             dist_coeff=self.camera_dist_coeff,
         )            
 
@@ -1891,8 +1863,8 @@ class CameraWidget(QWidget):
         ######################################
 
         # Set toggle to false to prevent undistort image -> but verify works ok on undistorted image ??
-        #self.test_started = False
-        #self.cal_imported = False
+        self.test_started = False
+        self.cal_imported = False
 
         #######################################
 

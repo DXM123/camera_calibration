@@ -15,16 +15,19 @@ class Warper(object):
         width: Union[int, float] = 640,
         height: Union[int, float] = 480,
         matrix: np.ndarray = None,
+        new_matrix: np.ndarray = None,
         dist_coeff: np.ndarray = None,
         interpolation=None,
     ):
         self.config = get_config()
         self.D = dist_coeff
         self.K = matrix
+        self.new_K = new_matrix
 
         # TEST
         print(f"Camera Distortion Coefficients: {self.D}")
         print(f"Camera Matrix: {self.K}")
+        print(f"Camera New Matrix: {self.new_K}")
 
         # TODO The types of width and height were inconsistent with their default
         # I fixed them now to be `Union[int, float]`. Do they have to be dynamic
@@ -108,39 +111,20 @@ class Warper(object):
         # Convert blended frame back to original data type (e.g., uint8)
         return blended_view.astype(dst.dtype)
     
-    ################################ TEST LUT ##############################
 
     def undistort_point(self, x, y):
-        # Print the distortion coefficients and camera matrix
-        #print("Distortion Coefficients:", self.D)
-        #print("Camera Matrix:", self.K)
-
 
         # Correct the point for lens distortion
         distorted = np.array([[[x, y]]], dtype=np.float32)
         #print("Distorted Point:", distorted)
 
-        # This needs an Update TODO (see: undistort_fisheye_frame)
-
-        ################################################ Step 1 ###########################################################
-        # std::vector<cv::Point2f> pointsUnwarped;
-        # cv::fisheye::undistortPoints(inputPoints, pointsUnwarped, _calData.K, _calData.D, cv::Matx33d::eye(), _calData.K);
-        ###################################################################################################################
-
-        undistorted = cv2.fisheye.undistortPoints(distorted, self.K, self.D, P=self.K)
+        undistorted = cv2.fisheye.undistortPoints(distorted, self.K, self.D, P=self.new_K)
         #print("Undistorted Point:", undistorted[0,0])
 
         undistorted_point = undistorted[0,0]
-        
 
-        #return undistorted[0,0]
         return undistorted_point
 
-    ########################### Step 2 ########################################
-    #std::vector<cv::Point2f> pointsResult;
-    #perspectiveTransform(pointsUnwarped, pointsResult, _calData.Hf);
-    ###########################################################################
-    
     def transform_point(self, x, y):
         Hv = self.Hv 
 
@@ -164,9 +148,6 @@ class Warper(object):
     def create_lookup_table(self, img_shape):
         height, width = img_shape
         lut = np.zeros((height, width, 2), dtype=np.float32)
-
-        # Add Camera Calibration
-        #lut = self.camera_correct(self, lut)
 
         for y in range(height):
             for x in range(width):
