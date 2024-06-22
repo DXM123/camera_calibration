@@ -42,8 +42,8 @@ class CameraWidget(QWidget):
     def __init__(self, parent: QMainWindow, video):
         super(QWidget, self).__init__(parent)
 
-        self.setMouseTracking(True)  # Enable mouse tracking
-        self.setFocusPolicy(Qt.StrongFocus)  # Ensure widget can accept focus
+        #self.setMouseTracking(True)  # Enable mouse tracking
+        #self.setFocusPolicy(Qt.StrongFocus)  # Ensure widget can accept focus
 
         self.video = video
         self.config = get_config()
@@ -319,7 +319,8 @@ class CameraWidget(QWidget):
         self.imageFrame.setFrameShape(QFrame.Box)
 
         # Set focus on ImageFrame to receive key events -> Is this working? TODO
-        #self.imageFrame.setFocusPolicy(Qt.StrongFocus)
+        self.imageFrame.setFocusPolicy(Qt.StrongFocus)
+        #self.imageFrame.setFocusPolicy(Qt.ClickFocus)
         self.tab2inner.layout.addWidget(self.imageFrame)
 
         # Store the initial size for later use
@@ -1754,16 +1755,26 @@ class CameraWidget(QWidget):
                 # Enable Start button again when all 4 points are collected
                 self.startButtonPwarp.setDisabled(False)
 
+                # DIsable mouse input to prevent loading new image
+                self.imageFrame.releaseMouse()
+                self.imageFrame.mousePressEvent = None
+
+                # Tweaking done , can stop keypress events
+                #self.imageFrame.keyPressEvent = None
+
                 # Stop mouse press event registration
                 #self.imageFrame.mousePressEvent = None
 
-                if not self.image_tuning_dewarp ==True and not self.verify_lut_started:
+                #if not self.image_tuning_dewarp ==True and not self.verify_lut_started:
                     # Stop mouse press event registration
-                    print("Disabeling mouse input on image Frame")
-                    self.imageFrame.mousePressEvent = None
-                    self.imageFrame.releaseMouse()
+                #    print("Disabeling mouse input on image Frame")
+                #    self.imageFrame.mousePressEvent = None
+                #    self.imageFrame.releaseMouse()
                     # self.imageFrame.keyPressEvent = None
-                elif self.verify_lut_started:
+                if self.verify_lut_started:
+                    # DOnt need keyboard input here
+                    self.imageFrame.releaseKeyboard()
+                    self.imageFrame.keyPressEvent = None
                     print("Enabeling mouse input on image Frame")
                     self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
@@ -1836,6 +1847,8 @@ class CameraWidget(QWidget):
             # First, disconnect all previously connected signals to avoid multiple connections.
             try:
                 self.startButtonPwarp.clicked.disconnect()
+                self.imageFrame.releaseMouse()
+                self.imageFrame.releaseKeyboard()
             except TypeError:
                 # If no connections exist, a TypeError is raised. Pass in this case.
                 pass
@@ -1853,15 +1866,15 @@ class CameraWidget(QWidget):
         # Input Mouse Clicks x,y on imageFrame
         # OutPut x,y on field_image
 
-        try:
+        #try:
             # Stop mouse and key press event registration
             # self.imageFrame.mousePressEvent = None
-            self.imageFrame.keyPressEvent = None
-            self.imageFrame.releaseKeyboard()
-            self.releaseKeyboard()
-        except TypeError:
+        #    self.imageFrame.keyPressEvent = None
+        #    self.imageFrame.releaseKeyboard()
+        #    self.releaseKeyboard()
+        #except TypeError:
             # If no connections exist, a TypeError is raised. Pass in this case.
-            pass
+        #    pass
 
         ######################################
 
@@ -1895,13 +1908,13 @@ class CameraWidget(QWidget):
         else:
             print("LUT verification already started. Skipping initialization.")
             self.imageFrame.setEnabled(True) # Enable ImageFrame again
-            #self.loadImage.setEnabled(True) # Enable load image
+            self.loadImage.setEnabled(True) # Enable load image
             print("Enabeling mouse input on image Frame")
 
             # Enable mouse click events
             self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
 
-        self.loadImage.setEnabled(True) # Enable load image
+        #self.loadImage.setEnabled(True) # Enable load image
 
         # First, disconnect all previously connected signals to avoid multiple connections.
         try:
@@ -2076,6 +2089,8 @@ class CameraWidget(QWidget):
 
             else:
                 print("Pixmap is not set")
+        else:
+            print("Wrong mouse event")
 
     # Overriding focusInEvent and focusOutEvent helps debug whether the widget has gained or lost focus.
     def focusInEvent(self, event):
@@ -2360,7 +2375,7 @@ class CameraWidget(QWidget):
         # Move to Testing LUT generated by save_prep_mat_binary
         if self.lut_saved == True:
 
-            self.startButtonPwarp.setEnabled(True)
+            #self.startButtonPwarp.setEnabled(True)
 
             # First, disconnect all previously connected signals to avoid multiple connections.
             try:
@@ -2371,7 +2386,7 @@ class CameraWidget(QWidget):
                 pass
 
             #self.startButtonPwarp.setText("DONE")
-            #self.startButtonPwarp.setEnabled(True)
+            self.startButtonPwarp.setEnabled(True)
             self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
             self.startButtonPwarp.clicked.connect(self.verify_lut)  # close when done
 
