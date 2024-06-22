@@ -113,19 +113,25 @@ class Warper(object):
         # Convert blended frame back to original data type (e.g., uint8)
         return blended_view.astype(dst.dtype)
 
+
     def create_lookup_table(self, img_shape: Tuple[int, int]):
         height, width = img_shape
         lut = np.zeros((height, width, 2), dtype=np.float32)
 
-        distorted_points = np.concatenate(
-            [np.repeat(np.arange(height), width)[:, np.newaxis], np.tile(np.arange(width), height)[:, np.newaxis]],
-            axis=-1,
-        ).astype(np.float32)
-        undistorted_points = cv2.fisheye.undistortPoints(
-            distorted_points[np.newaxis, :, :], self.K, self.D, P=self.new_K
-        )
-        lut[distorted_points[:, 0].astype(int), distorted_points[:, 1].astype(int)] = cv2.perspectiveTransform(
-            undistorted_points, self.Hv
-        ).reshape(distorted_points.shape)
+        # Create an array of all distorted points
+        distorted_points = np.array([[x, y] for y in range(height) for x in range(width)], dtype=np.float32)
+        distorted_points = distorted_points.reshape(-1, 1, 2)
+
+        # Undistort the points
+        undistorted_points = cv2.fisheye.undistortPoints(distorted_points, self.K, self.D, P=self.new_K)
+
+        # Transform the undistorted points
+        undistorted_points = undistorted_points.reshape(1, -1, 2)
+        transformed_points = cv2.perspectiveTransform(undistorted_points, self.Hv)
+
+        # Reshape the transformed points and assign them to the LUT
+        transformed_points = transformed_points.reshape(-1, 2)
+        lut[:, :, 0] = transformed_points[:, 0].reshape(height, width)
+        lut[:, :, 1] = transformed_points[:, 1].reshape(height, width)
 
         return lut

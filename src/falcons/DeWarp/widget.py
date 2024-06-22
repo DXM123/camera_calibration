@@ -42,6 +42,9 @@ class CameraWidget(QWidget):
     def __init__(self, parent: QMainWindow, video):
         super(QWidget, self).__init__(parent)
 
+        self.setMouseTracking(True)  # Enable mouse tracking
+        self.setFocusPolicy(Qt.StrongFocus)  # Ensure widget can accept focus
+
         self.video = video
         self.config = get_config()
         self.min_cap = self.config.min_cap
@@ -150,13 +153,13 @@ class CameraWidget(QWidget):
         # Initialize tab screen
         self.tabs = QTabWidget()
         # self.tabs.setFocusPolicy(Qt.ClickFocus)  # or Qt.StrongFocus
-        self.tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
+        #self.tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
 
         ## Prevent stealing focus -> policy! for imageFrame and CameraFrame while using Key + mouse events!! TODO
 
         self.tab1 = QWidget()
         self.tab2 = QWidget()
-        self.tab2.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
+        #self.tab2.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
         #self.tabs.resize(300, 200)
 
         # Add tabs
@@ -2073,6 +2076,17 @@ class CameraWidget(QWidget):
 
             else:
                 print("Pixmap is not set")
+
+    # Overriding focusInEvent and focusOutEvent helps debug whether the widget has gained or lost focus.
+    def focusInEvent(self, event):
+        # Debug focus events
+        print("Widget has gained focus")
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        # Debug focus events
+        print("Widget has lost focus")
+        super().focusOutEvent(event)
 
     def keypress_tuning_event(self, event):
         if len(self.points) == 4:  # Ensure 4 points are selected
