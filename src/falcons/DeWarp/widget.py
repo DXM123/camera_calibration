@@ -42,9 +42,6 @@ class CameraWidget(QWidget):
     def __init__(self, parent: QMainWindow, video):
         super(QWidget, self).__init__(parent)
 
-        #self.setMouseTracking(True)  # Enable mouse tracking
-        #self.setFocusPolicy(Qt.StrongFocus)  # Ensure widget can accept focus
-
         self.video = video
         self.config = get_config()
         self.min_cap = self.config.min_cap
@@ -152,15 +149,11 @@ class CameraWidget(QWidget):
 
         # Initialize tab screen
         self.tabs = QTabWidget()
-        # self.tabs.setFocusPolicy(Qt.ClickFocus)  # or Qt.StrongFocus
+        #self.tabs.setFocusPolicy(Qt.ClickFocus)  # or Qt.StrongFocus
         #self.tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
-
-        ## Prevent stealing focus -> policy! for imageFrame and CameraFrame while using Key + mouse events!! TODO
 
         self.tab1 = QWidget()
         self.tab2 = QWidget()
-        #self.tab2.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
-        #self.tabs.resize(300, 200)
 
         # Add tabs
         self.tabs.addTab(self.tab1, "Camera Calibration")
@@ -585,8 +578,6 @@ class CameraWidget(QWidget):
             # Set guiding info in output window
             self.outputWindow.setText(f"No more images to load, press DONE to process")
 
-            # GOTO NEXT -> Press DONE
-
     # This is working when using general name 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Space):
@@ -861,7 +852,6 @@ class CameraWidget(QWidget):
                 # self.update_status_signal.emit(f"Capturing in {self.countdown_seconds} seconds...")
                 print("Capturing in", self.countdown_seconds, "seconds...")
             elif ret_corners and self.countdown_seconds == 0:
-                #self.save_screenshot(frame)  # Save the original frame
                 self.save_screenshot(org_img)  # Save the original resized frame
                 self.countdown_seconds = self.config.countdown_seconds  # Reset the countdown after saving
 
@@ -869,15 +859,12 @@ class CameraWidget(QWidget):
                 # Display the frame with corners
                 self.pixmap = self.CameraToPixmap(frame_with_corners)
                 self.cameraFrame.setPixmap(self.pixmap)
-                # Optional: Resize if needed
-                # self.cameraFrame.resize(self.pixmap.size())
+
             else:
                 # Display the original frame
-                #self.pixmap = self.CameraToPixmap(frame)
                 self.pixmap = self.CameraToPixmap(self.cv_image)
                 self.cameraFrame.setPixmap(self.pixmap)
-                # Optional: Resize if needed
-                # self.cameraFrame.resize(self.pixmap.size())
+
 
     def displayPylonImage(self, img):
             self.pixmap = self.CameraToPixmap(img)
@@ -906,13 +893,13 @@ class CameraWidget(QWidget):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Find the chess board corners. If desired number of corners are found in the image then ret = true
-        #findchessboard_start_time = time.time()
+        findchessboard_start_time = time.time()
         ret, corners = cv2.findChessboardCorners(
             gray,
             (columns, rows),
             flags,
         )
-        #print("Find chessboard on image took: {:.2f} seconds".format(time.time() - findchessboard_start_time))
+        print("Find chessboard on image took: {:.2f} seconds".format(time.time() - findchessboard_start_time))
 
         if ret:
             print("Corners detected successfully!")
@@ -1338,14 +1325,10 @@ class CameraWidget(QWidget):
                 self.perform_calibration()
             self.timer.start(100) # Start camera feed
 
-########################################################################################
-
         if self.input_pylon.isChecked():
             if not self.cal_imported:
                 self.perform_calibration_fisheye() # Somethings off using Pylon and the <New Camera Matrix:> calculated
             self.pylon_start()
-
-#######################################################################################
 
         # Emit the signal with the updated status text
         self.update_status_signal.emit("Testing in progess....")
@@ -1390,7 +1373,6 @@ class CameraWidget(QWidget):
             return frame
         
     # When lens field of view is above 160 degree we need fisheye undistort function for opencv (This one works, but cuts to much of the frame)
-
     # Play with Balance / ROI ! What is required for landmark selection !!! balance=0 is ROI vs balance=1 whole picture undistorted, or 0.8 for original :)
 
     def undistort_fisheye_frame(self, frame, camera_matrix, distortion_coefficients, balance=0, dim2=None, dim3=None):
@@ -1623,14 +1605,10 @@ class CameraWidget(QWidget):
                 # network_dewarp()
                 print("Starting network de-warp")  # -> update status
 
-            ##############################################################
-
             # Start Pylon Thread again
             elif self.pylon_dewarp == True:
                 # network_dewarp()
                 print("Starting Pylon de-warp")  # -> update status
-
-            ############################################################3
 
         else:
             # Disable the first tab (Camera Calibration)
@@ -1679,10 +1657,6 @@ class CameraWidget(QWidget):
         if self.image_tuning_dewarp == True:
             print("Perspective Tuning is started")
 
-            # Stop mouse and key press event registration
-            # self.imageFrame.mousePressEvent = None
-            # self.imageFrame.keyPressEvent = None
-
             # Start collecting arrow key events
             self.imageFrame.keyPressEvent = self.keypress_tuning_event
 
@@ -1699,7 +1673,7 @@ class CameraWidget(QWidget):
                 self.pixmap = self.imageToPixmap(self.field_image)
                 pixmap = QPixmap(self.pixmap)
 
-                # Load the image
+                # Load the Field image
                 self.ProcessImage.setPixmap(pixmap)
                 self.ProcessImage.setScaledContents(True)
 
@@ -1759,18 +1733,6 @@ class CameraWidget(QWidget):
                 self.imageFrame.releaseMouse()
                 self.imageFrame.mousePressEvent = None
 
-                # Tweaking done , can stop keypress events
-                #self.imageFrame.keyPressEvent = None
-
-                # Stop mouse press event registration
-                #self.imageFrame.mousePressEvent = None
-
-                #if not self.image_tuning_dewarp ==True and not self.verify_lut_started:
-                    # Stop mouse press event registration
-                #    print("Disabeling mouse input on image Frame")
-                #    self.imageFrame.mousePressEvent = None
-                #    self.imageFrame.releaseMouse()
-                    # self.imageFrame.keyPressEvent = None
                 if self.verify_lut_started:
                     # DOnt need keyboard input here
                     self.imageFrame.releaseKeyboard()
@@ -1821,10 +1783,6 @@ class CameraWidget(QWidget):
         print(f"Final src points after tweaking: {self.warper.src_points}")
         self.final_src_points = self.warper.src_points
 
-        # Disable input
-        #self.imageFrame.mousePressEvent = None
-        #self.imageFrame.keyPressEvent = None
-
         # Disable widget -> Maybe a bit much
         self.imageFrame.setEnabled(False)
 
@@ -1838,9 +1796,6 @@ class CameraWidget(QWidget):
         # Set save options TODO
         self.startButtonPwarp.setText("Save to binary file")
         self.startButtonPwarp.clicked.connect(self.save_prep_mat_binary)
-
-        ###############################################################
-        # Move to Testing LUT generated by save_prep_mat_binary
 
         if self.lut_saved == True:
 
@@ -1861,28 +1816,10 @@ class CameraWidget(QWidget):
 
     def verify_lut(self):
         print(f"Start Verify Lookup Table (LUT)")
-        # CLick (Mouse Click event) ImageFrame and get x,y -> get x,y from LUT and show transformed point of imageField
-        # Input Generated LUT binary file
-        # Input Mouse Clicks x,y on imageFrame
-        # OutPut x,y on field_image
-
-        #try:
-            # Stop mouse and key press event registration
-            # self.imageFrame.mousePressEvent = None
-        #    self.imageFrame.keyPressEvent = None
-        #    self.imageFrame.releaseKeyboard()
-        #    self.releaseKeyboard()
-        #except TypeError:
-            # If no connections exist, a TypeError is raised. Pass in this case.
-        #    pass
-
-        ######################################
 
         # Set toggle to false to prevent undistort image -> but verify works ok on undistorted image ??
         self.test_started = False
         self.cal_imported = False
-
-        #######################################
 
         # Only load LUT once during start
         if not self.verify_lut_started:
@@ -1896,13 +1833,10 @@ class CameraWidget(QWidget):
                 print(f"LUT loaded successfully from {self.lut_filename}")
                 
                 # now must be mat.bin in root TODO add way to load it like calibration in 3e tab?
-                # Not supported now to load a previous generated LUT
 
             # Set LUT verify as Started
             self.verify_lut_started = True
             print("LUT verification started.")
-            #self.imageFrame.setEnabled(True) # Enable ImageFrame again
-            #self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
             self.verify_lut()
             print ("Verify LUT")
         else:
@@ -1911,10 +1845,9 @@ class CameraWidget(QWidget):
             self.loadImage.setEnabled(True) # Enable load image
             print("Enabeling mouse input on image Frame")
 
-            # Enable mouse click events
+            # Enable mouse click events - NOT WORKING ? TODO
+            self.imageFrame.setFocus
             self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
-
-        #self.loadImage.setEnabled(True) # Enable load image
 
         # First, disconnect all previously connected signals to avoid multiple connections.
         try:
@@ -2029,7 +1962,6 @@ class CameraWidget(QWidget):
                 if self.test_started or self.cal_imported:
 
                     # Camera input not fisheye TODO create fisheye toggle
-                    #if self.input_camera.isChecked():
                     if self.input_camera.isChecked() and self.tabs.currentIndex() == 0: # TODO This needs attention -> now only works since tab two onlyhas images
                         undistorted_frame = self.undistort_frame(frame, self.camera_matrix, self.camera_dist_coeff)
                     else:
@@ -2056,11 +1988,6 @@ class CameraWidget(QWidget):
 
                         print(f"Transformed point (Rounded): {rounded_transformed_point}")
 
-                        # Draw Transformed points on soccer Field Image
-                        #self.field_image_selected = self.draw_landmark_selected(
-                        #    self.field_image.copy(), transformed_point, MarkerColors.Yellow.value
-                        #)
-
                         # Using rounded values
                         self.field_image_selected = self.draw_landmark_selected(
                             self.field_image.copy(), rounded_transformed_point, MarkerColors.Yellow.value
@@ -2079,13 +2006,6 @@ class CameraWidget(QWidget):
 
                     else:
                         print("Point is out of the bounds of the LUT.")
-
-                ####################################################################
-                # Draw Transformed points on soccer Field Image
-                #self.field_image_selected = self.draw_landmark_selected(
-                #    self.field_image.copy(), self.landmark_points[self.selected_point], MarkerColors.Yellow.value
-                #)
-                ##################################################################
 
             else:
                 print("Pixmap is not set")
@@ -2354,7 +2274,7 @@ class CameraWidget(QWidget):
 
         print(f"Generating the binary LUT, please be patient!")
 
-        #Below is not beeing displayed !!!
+        #Below is not beeing displayed !!! TODO
         self.processoutputWindow.setText(f"Generating the binary LUT, please be patient!")
         self.update_status_signal.emit(f"Generating the binary LUT, please be patient!")
 
@@ -2365,17 +2285,12 @@ class CameraWidget(QWidget):
         except TypeError:
             pass
 
-        # Create the lookup table
-        #self.lut = self.warper.create_lookup_table(img_shape)
-
         #return self.save_mat_binary(self.lut_filename, self.lut)
         self.save_mat_binary(self.lut_filename, self.lut)
 
-        ###############################################################
-        # Move to Testing LUT generated by save_prep_mat_binary
         if self.lut_saved == True:
 
-            #self.startButtonPwarp.setEnabled(True)
+            #Clear FieldImage
 
             # First, disconnect all previously connected signals to avoid multiple connections.
             try:
@@ -2388,7 +2303,7 @@ class CameraWidget(QWidget):
             #self.startButtonPwarp.setText("DONE")
             self.startButtonPwarp.setEnabled(True)
             self.startButtonPwarp.setText("Verify Lookup Table (LUT)")
-            self.startButtonPwarp.clicked.connect(self.verify_lut)  # close when done
+            self.startButtonPwarp.clicked.connect(self.verify_lut)  
 
     def save_mat_binary(self, filename, output):
         with open(filename, 'wb') as ofs:

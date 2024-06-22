@@ -140,10 +140,6 @@ class CamCalMain(QMainWindow):
                 with open(file_name, "r") as f:
                     data = json.load(f)
 
-                    # Load into camera widget variable
-                    #self.camera_widget.camera_matrix = data.get("camera_matrix")
-                    #self.camera_widget.camera_dist_coeff = data.get("dist_coeff")
-
                     # Convert lists to numpy arrays
                     self.camera_widget.camera_matrix = np.array(data.get("camera_matrix"))
                     self.camera_widget.camera_dist_coeff = np.array(data.get("dist_coeff"))
@@ -167,17 +163,6 @@ class CamCalMain(QMainWindow):
 
                     # Set tracker to True in camera_widget, needed in test_cam_calibration
                     self.camera_widget.cal_imported = True
-
-                    # Add logic to distinct loading in tab 1 or tab 2 TODO
-
-                    # Disable Capture Button when import succeeded -> only when pixmap or images loaded TODO
-                    #self.camera_widget.captureButton1.setDisabled(True)
-
-                    # Start Camera when selected -> but is selected by default -> set image as default?
-                    #if self.camera_widget.input_camera.isChecked():
-                    #    self.camera_widget.start_capture()
-
-                    #if self.camera_widget.input_images.isChecked():
 
                     # First, disconnect all previously connected signals to avoid multiple connections.
                     try:

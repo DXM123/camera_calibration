@@ -4,7 +4,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from pypylon import pylon
 import numpy as np
-#import cv2
 
 # Basler Pylon : daA1920-160uc
 
@@ -148,20 +147,8 @@ class PylonThread(QThread):
                     image = converter.Convert(grabResult)
                     img = image.GetArray()
 
-                    # Move outside of thread 
-                    #original_height, original_width = img.shape[:2]
-
-                    # Calculate the new dimensions (half of the original dimensions)
-                    #new_width = original_width // 2
-                    #new_height = original_height // 2
-                    #dim = (new_width, new_height)
-
-                    # Resize image
-                    #img_scaled = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
-
                     # Send the img instead so we can process directly in opencv
                     self.imageSignal.emit(img)
-                    #self.imageSignal.emit(img_scaled)
 
                 grabResult.Release()
 
