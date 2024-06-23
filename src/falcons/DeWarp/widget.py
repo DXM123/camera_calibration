@@ -149,8 +149,9 @@ class CameraWidget(QWidget):
 
         # Initialize tab screen
         self.tabs = QTabWidget()
+
         #self.tabs.setFocusPolicy(Qt.ClickFocus)  # or Qt.StrongFocus
-        #self.tabs.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # TEST TODO
 
         self.tab1 = QWidget()
         self.tab2 = QWidget()
@@ -312,8 +313,8 @@ class CameraWidget(QWidget):
         self.imageFrame.setFrameShape(QFrame.Box)
 
         # Set focus on ImageFrame to receive key events -> Is this working? TODO
-        self.imageFrame.setFocusPolicy(Qt.StrongFocus)
-        #self.imageFrame.setFocusPolicy(Qt.ClickFocus)
+        #self.imageFrame.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.imageFrame.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.tab2inner.layout.addWidget(self.imageFrame)
 
         # Store the initial size for later use
@@ -324,6 +325,12 @@ class CameraWidget(QWidget):
 
         # Add Start De-warp Button last
         self.startButtonPwarp = QPushButton("START Selecting Landmarks", self.tab2inner)
+        
+        if self.pixmap == None:
+            self.startButtonPwarp.setEnabled(False)
+        else:
+            self.startButtonPwarp.setEnabled(True)
+
         self.startButtonPwarp.clicked.connect(self.start_pwarp)
         self.tab2inner.layout.addWidget(self.startButtonPwarp)
 
@@ -582,6 +589,17 @@ class CameraWidget(QWidget):
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Space):
             self.load_next_image()
+
+    # Overriding focusInEvent and focusOutEvent helps debug whether the widget has gained or lost focus.
+    def focusInEvent(self, event):
+        # Debug focus events
+        print("Widget has gained focus")
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event):
+        # Debug focus events
+        print("Widget has lost focus")
+        super().focusOutEvent(event)
 
     def start_capture(self):
         if not self.capture_started:
@@ -1516,6 +1534,9 @@ class CameraWidget(QWidget):
 
             self.display_image(file_name)
 
+        if self.imageFrame.pixmap is not None:
+            self.startButtonPwarp.setEnabled(True)
+
     def start_pwarp(self):
         # Stop Camera -> also stopped after save
         #self.timer.stop() # Should not be here ! works for now since only images are used
@@ -1575,14 +1596,20 @@ class CameraWidget(QWidget):
 
                         ## Check if tweak already started to prevent overwrite button text
                         if not self.image_tuning_dewarp == True:
+
+                            # disconnect the any connection
+                            try:
+                                self.startButtonPwarp.clicked.disconnect()
+                                #self.startButtonPwarp.clicked.disconnect(self.start_pwarp)
+                            except TypeError:
+                                # If no connections exist, a TypeError is raised. Pass in this case.
+                                pass
+
                             # Update button text for next step
                             self.startButtonPwarp.setText("Tweak Landmarks")
 
                             # Tweak landmarks
                             self.startButtonPwarp.clicked.connect(self.tweak_pwarp)
-
-                            # disconnect the previous connection
-                            self.startButtonPwarp.clicked.disconnect(self.start_pwarp)
 
                     else:
                         print("Invalid frame format: Not a 3D array (color image)")
@@ -1614,9 +1641,8 @@ class CameraWidget(QWidget):
             # Disable the first tab (Camera Calibration)
             #self.tabs.setTabEnabled(0, False) # Should not be here !
 
-            # Clear Image from self.imageFrame
+            # Clear Image from self.imageFrame from tab 1
             self.cameraFrame.setPixmap(QPixmap())
-            self.imageFrame.setPixmap(QPixmap()) 
 
             # Switch to the second tab (Perspective-Warp)
             self.tabs.setCurrentIndex(1) # Should not be here !
@@ -1627,6 +1653,7 @@ class CameraWidget(QWidget):
                 self.cameraFrame.keyPressEvent = None
                 self.cameraFrame.releaseKeyboard()
                 self.tabs.setTabEnabled(0, False) # Should not be here !
+                self.startButtonPwarp.setEnabled(False)
             except TypeError:
                 # If no connections exist, a TypeError is raised. Pass in this case.
                 pass
@@ -1733,12 +1760,12 @@ class CameraWidget(QWidget):
                 self.imageFrame.releaseMouse()
                 self.imageFrame.mousePressEvent = None
 
-                if self.verify_lut_started:
-                    # DOnt need keyboard input here
-                    self.imageFrame.releaseKeyboard()
-                    self.imageFrame.keyPressEvent = None
-                    print("Enabeling mouse input on image Frame")
-                    self.imageFrame.mousePressEvent = self.mouse_click_landmark_event
+                #if self.verify_lut_started:
+                #    # DOnt need keyboard input here
+                #    self.imageFrame.releaseKeyboard()
+                #    self.imageFrame.keyPressEvent = None
+                #    print("Enabeling mouse input on image Frame")
+                #    self.imageFrame.mousePressEvent = self.mouse_click_landmark_event # Not working?
 
                 if self.image_tuning_dewarp:
 
@@ -1746,6 +1773,13 @@ class CameraWidget(QWidget):
                     self.startButtonPwarp.clicked.connect(self.stop_tuning)
 
                 break
+
+            if self.verify_lut_started:
+                # DOnt need keyboard input here
+                self.imageFrame.releaseKeyboard()
+                self.imageFrame.keyPressEvent = None
+                print("Enabeling mouse input on image Frame")
+                self.imageFrame.mousePressEvent = self.mouse_click_landmark_event # Not working?
 
             QApplication.processEvents()
 
@@ -1775,6 +1809,18 @@ class CameraWidget(QWidget):
     def stop_tuning(self):
         self.image_tuning_dewarp == False
 
+        try:
+            self.imageFrame.releaseMouse()
+            self.imageFrame.releaseMouse()
+            self.imageFrame.keyPressEvent = None
+            self.imageFrame.mousePressEvent = None
+            self.startButtonPwarp.clicked.disconnect()
+            # Disable widget -> Maybe a bit much
+            self.imageFrame.setEnabled(False)
+        except TypeError:
+            # If no connections exist, a TypeError is raised. Pass in this case.
+            pass
+
         #Final self.hv
         print(f"Final Homography Matrix (Hv) after tweaking: {self.warper.Hv}")
         self.final_Hv = self.warper.Hv
@@ -1782,16 +1828,6 @@ class CameraWidget(QWidget):
         #Final Points
         print(f"Final src points after tweaking: {self.warper.src_points}")
         self.final_src_points = self.warper.src_points
-
-        # Disable widget -> Maybe a bit much
-        self.imageFrame.setEnabled(False)
-
-        # First, disconnect all previously connected signals to avoid multiple connections.
-        try:
-            self.startButtonPwarp.clicked.disconnect()
-        except TypeError:
-            # If no connections exist, a TypeError is raised. Pass in this case.
-            pass
 
         # Set save options TODO
         self.startButtonPwarp.setText("Save to binary file")
@@ -1927,9 +1963,8 @@ class CameraWidget(QWidget):
 
             if self.imageFrame.pixmap() is not None:
                 self.processoutputWindow.setText("Image loaded")
-                    
                 self.update_image_feed(self.cv_image) 
-
+                self.startButtonPwarp.setEnabled(True)
             else:
                 self.processoutputWindow.setText("Problem displaying image")
 
@@ -1942,6 +1977,7 @@ class CameraWidget(QWidget):
 
     # To Capture landmarks with mouse clicks
     def mouse_click_landmark_event(self, event):
+        #self.imageFrame.setFocus()  # Set focus to this widget when clicked
         if event.button() == Qt.LeftButton:
             x = event.x()
             y = event.y()
@@ -2012,16 +2048,6 @@ class CameraWidget(QWidget):
         else:
             print("Wrong mouse event")
 
-    # Overriding focusInEvent and focusOutEvent helps debug whether the widget has gained or lost focus.
-    def focusInEvent(self, event):
-        # Debug focus events
-        print("Widget has gained focus")
-        super().focusInEvent(event)
-
-    def focusOutEvent(self, event):
-        # Debug focus events
-        print("Widget has lost focus")
-        super().focusOutEvent(event)
 
     def keypress_tuning_event(self, event):
         if len(self.points) == 4:  # Ensure 4 points are selected
