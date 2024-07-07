@@ -8,7 +8,6 @@ import numpy as np
 from .common import MarkerColors, SoccerFieldColors
 from .config import get_config
 
-
 class Warper(object):
     def __init__(
         self,
@@ -44,8 +43,18 @@ class Warper(object):
         self.src_height = height
         self.src_points = points
         self.landmark_points = landmark_points  # Field Coordinate FCS
+        config = get_config()
+        self.landmark_points_field = np.array(
+            [
+                config.landmark1,
+                config.landmark2,
+                config.landmark3,
+                config.landmark4,
+            ]
+        )
         # self.dst = None
-        self.Hv = None
+        # self.HvImage = None
+        self.HvRobot = None
 
         # logging.info(
         print(
@@ -55,16 +64,19 @@ class Warper(object):
         )
 
         # Two way to calculate the Homography Hv (output is identical but one also produces mask (not used now))
-        self.Hv = cv2.getPerspectiveTransform(
+        self.HvImage = cv2.getPerspectiveTransform(
             self.src_points.astype(np.float32), self.landmark_points.astype(np.float32)
+        )
+        self.HvRobot = cv2.getPerspectiveTransform(
+            self.src_points.astype(np.float32), self.landmark_points_field.astype(np.float32)
         )
         # self.Hv, mask = cv2.findHomography(self.src_points.astype(np.float32), self.landmark_points.astype(np.float32), cv2.RANSAC,5.0)
 
-        if self.Hv is not None:
-            print("Homography Matrix (Hv):")
-            print(self.Hv)
+        if self.HvRobot is not None:
+            print("Homography Matrix (HvRobot):")
+            print(self.HvRobot)
         else:
-            print("Homography Matrix (Hv) is not set.")
+            print("Homography Matrix (HvRobot) is not set.")
 
         if interpolation == None:
             self.interpolation = cv2.INTER_CUBIC
@@ -77,7 +89,7 @@ class Warper(object):
             f"Executing warpPerspective, src_width={src_img.shape[1]}, src_height={src_img.shape[0]}, dst_width={dst_img.shape[1]}, dst_height={dst_img.shape[0]}"
         )
 
-        self.plan_view = cv2.warpPerspective(src_img, self.Hv, (dst_img.shape[1], dst_img.shape[0]))
+        self.plan_view = cv2.warpPerspective(src_img, self.HvImage, (dst_img.shape[1], dst_img.shape[0]))
 
         # Print the actual resulting image size after resizing or not
         print(f"Result after warp: width={self.plan_view.shape[1]}, height={self.plan_view.shape[0]}")
@@ -127,7 +139,7 @@ class Warper(object):
 
         # Transform the undistorted points
         undistorted_points = undistorted_points.reshape(1, -1, 2)
-        transformed_points = cv2.perspectiveTransform(undistorted_points, self.Hv)
+        transformed_points = cv2.perspectiveTransform(undistorted_points, self.HvRobot)
 
         # Reshape the transformed points and assign them to the LUT
         transformed_points = transformed_points.reshape(-1, 2)

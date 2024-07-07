@@ -3,7 +3,7 @@ import os
 from typing import Optional, Tuple
 
 import yaml
-
+import numpy as np
 
 @dataclasses.dataclass
 class DeWarpConfig:
@@ -76,27 +76,33 @@ class DeWarpConfig:
             int(self.field_width_total / 2) * self.ppm,
         )
 
-        self.landmark1 = (self.center_circle_radius, 0)
-        self.landmark2 = (self.field_width / 2, 0)
-        self.landmark3 = (0, self.center_circle_radius)
-        self.landmark4 = (0, self.field_width / 2)
+        self.transposeRobotToImage = np.matrix([
+            [-100, 0],
+            [0, -100],
+            [1000, 700]
+        ])
+
+        self.landmark1 = (0, self.center_circle_radius)
+        self.landmark2 = (0, self.field_width / 2)
+        self.landmark3 = (self.center_circle_radius, 0)
+        self.landmark4 = (self.field_width / 2, 0)
 
         # TODO Why are the x-y coordinates flipped wrt to the landmarks?
         self.field_coordinates_lm1 = (
-            int((self.field_length_total / 2 - self.landmark1[1]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark1[0]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark1[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark1[1]) * self.ppm),
         )
         self.field_coordinates_lm2 = (
-            int((self.field_length_total / 2 - self.landmark2[1]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark2[0]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark2[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark2[1]) * self.ppm),
         )
         self.field_coordinates_lm3 = (
-            int((self.field_length_total / 2 - self.landmark3[1]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark3[0]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark3[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark3[1]) * self.ppm),
         )
         self.field_coordinates_lm4 = (
-            int((self.field_length_total / 2 - self.landmark4[1]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark4[0]) * self.ppm),
+            int((self.field_length_total / 2 - self.landmark4[0]) * self.ppm),
+            int((self.field_width_total / 2 - self.landmark4[1]) * self.ppm),
         )
 
 

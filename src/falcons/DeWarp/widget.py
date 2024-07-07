@@ -6,6 +6,7 @@ import time
 import cv2
 import numpy as np
 import glob # for load_images
+import math
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
@@ -84,7 +85,7 @@ class CameraWidget(QWidget):
         self.verify_lut_started = False # Track if LUT testing is started
 
         #Store Final self.hv
-        self.final_Hv = None
+        self.final_HvRobot = None
 
         #Store Final Points
         self.final_src_points = None
@@ -1822,8 +1823,8 @@ class CameraWidget(QWidget):
             pass
 
         #Final self.hv
-        print(f"Final Homography Matrix (Hv) after tweaking: {self.warper.Hv}")
-        self.final_Hv = self.warper.Hv
+        print(f"Final Homography Matrix (HvRobot) after tweaking: {self.warper.HvRobot}")
+        self.final_HvRobot = self.warper.HvRobot
 
         #Final Points
         print(f"Final src points after tweaking: {self.warper.src_points}")
@@ -2017,16 +2018,20 @@ class CameraWidget(QWidget):
                     if transformed_point:
                         print(f"Original point: ({x}, {y})")
                         print(f"Transformed point: {transformed_point}")
+                        print(f"angle: {np.arctan2(*transformed_point)-math.pi/4}")
+                        transformed_point_image = (np.array([*transformed_point, 1]) @ self.config.transposeRobotToImage)
+                        transformed_point_image = np.array(transformed_point_image)[0]
+                        print(f"Transformed point image: {transformed_point_image}")
 
                         #Refine transformed point to support x, y
                         # Round the transformed point coordinates to the nearest integers
-                        rounded_transformed_point = (round(transformed_point[0]), round(transformed_point[1]))
+                        rounded_transformed_point_image = (round(transformed_point_image[0]), round(transformed_point_image[1]))
 
-                        print(f"Transformed point (Rounded): {rounded_transformed_point}")
+                        print(f"Transformed point (Rounded): {rounded_transformed_point_image}")
 
                         # Using rounded values
                         self.field_image_selected = self.draw_landmark_selected(
-                            self.field_image.copy(), rounded_transformed_point, MarkerColors.Yellow.value
+                            self.field_image.copy(), rounded_transformed_point_image, MarkerColors.Yellow.value
                         )
 
                         # Convert to Pixman
