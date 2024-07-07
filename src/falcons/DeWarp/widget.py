@@ -133,12 +133,7 @@ class CameraWidget(QWidget):
         # Also part of Warper Class
         # TODO Add logic to define landmark based on cam id [0-3]
         self.landmark_points = np.array(
-            [
-                self.config.field_coordinates_lm1,
-                self.config.field_coordinates_lm2,
-                self.config.field_coordinates_lm3,
-                self.config.field_coordinates_lm4,
-            ]
+            self.config.field_coordinates_lmks
         )
 
         ############################
@@ -1689,91 +1684,22 @@ class CameraWidget(QWidget):
             self.imageFrame.keyPressEvent = self.keypress_tuning_event
 
         # Starts a loop collecting points
-        while True:
-            if len(self.points) == 0:
-                self.processoutputWindow.setText(f"Select the first landmark {self.config.landmark1}")
-                # Draw landmark 1 on 2d field view
-                # print("Drawing landmark 1:", landmark1)
-                self.field_image = self.draw_landmark(
-                    self.field_image, self.config.field_coordinates_lm1, SoccerFieldColors.Red.value
-                )
-                # Convert to Pixman
-                self.pixmap = self.imageToPixmap(self.field_image)
-                pixmap = QPixmap(self.pixmap)
+        while len(self.points) < len(self.config.field_coordinates_lmks):
+            point_Id = len(self.points)
+            print(self.points)
+            landMark_img = self.config.field_coordinates_lmks[point_Id]
+            landMark_robot = self.config.landmarks[point_Id]
+            self.processoutputWindow.setText(f"Select landmark number {point_Id} ({landMark_robot})")
+            self.field_image = self.draw_landmark(self.field_image, landMark_img, SoccerFieldColors.Red.value)
 
-                # Load the Field image
-                self.ProcessImage.setPixmap(pixmap)
-                self.ProcessImage.setScaledContents(True)
+            # Convert to Pixman
+            self.pixmap = self.imageToPixmap(self.field_image)
+            pixmap = QPixmap(self.pixmap)
 
-            if len(self.points) == 1:
-                self.processoutputWindow.setText(f"Select the second landmark {self.config.landmark2}")
-                # Draw landmark 2 on 2d field view
-                # print("Drawing landmark 2:", landmark2)
-                self.field_image = self.draw_landmark(
-                    self.field_image, self.config.field_coordinates_lm2, SoccerFieldColors.Red.value
-                )
+            # Load the Field image
+            self.ProcessImage.setPixmap(pixmap)
+            self.ProcessImage.setScaledContents(True)
 
-                # Convert to Pixman
-                self.pixmap = self.imageToPixmap(self.field_image)
-                pixmap = QPixmap(self.pixmap)
-
-                # Load the image
-                self.ProcessImage.setPixmap(pixmap)
-                self.ProcessImage.setScaledContents(True)
-
-            if len(self.points) == 2:
-                self.processoutputWindow.setText(f"Select the third landmark {self.config.landmark3}")
-                # Draw landmark 3 on 2d field view
-                # print("Drawing landmark 3:", landmark3)
-                self.field_image = self.draw_landmark(
-                    self.field_image, self.config.field_coordinates_lm3, SoccerFieldColors.Red.value
-                )
-
-                # Convert to Pixman
-                self.pixmap = self.imageToPixmap(self.field_image)
-                pixmap = QPixmap(self.pixmap)
-
-                # Load the image
-                self.ProcessImage.setPixmap(pixmap)
-                self.ProcessImage.setScaledContents(True)
-
-            if len(self.points) == 3:
-                self.processoutputWindow.setText(f"Select the last landmark {self.config.landmark4}")
-                # Draw landmark 4 on 2d field view
-                # print("Drawing landmark 4:", landmark4)
-                self.field_image = self.draw_landmark(
-                    self.field_image, self.config.field_coordinates_lm4, SoccerFieldColors.Red.value
-                )
-
-                # Convert to Pixman
-                self.pixmap = self.imageToPixmap(self.field_image)
-                pixmap = QPixmap(self.pixmap)
-
-                # Load the image
-                self.ProcessImage.setPixmap(pixmap)
-                self.ProcessImage.setScaledContents(True)
-
-            if len(self.points) == 4:
-                # Enable Start button again when all 4 points are collected
-                self.startButtonPwarp.setDisabled(False)
-
-                # DIsable mouse input to prevent loading new image
-                self.imageFrame.releaseMouse()
-                self.imageFrame.mousePressEvent = None
-
-                #if self.verify_lut_started:
-                #    # DOnt need keyboard input here
-                #    self.imageFrame.releaseKeyboard()
-                #    self.imageFrame.keyPressEvent = None
-                #    print("Enabeling mouse input on image Frame")
-                #    self.imageFrame.mousePressEvent = self.mouse_click_landmark_event # Not working?
-
-                if self.image_tuning_dewarp:
-
-                    self.startButtonPwarp.setText("Click when done tuning")   ## Not updating TODO
-                    self.startButtonPwarp.clicked.connect(self.stop_tuning)
-
-                break
 
             if self.verify_lut_started:
                 # DOnt need keyboard input here
@@ -1783,6 +1709,15 @@ class CameraWidget(QWidget):
                 self.imageFrame.mousePressEvent = self.mouse_click_landmark_event # Not working?
 
             QApplication.processEvents()
+
+        # Enable Start button again when all points are collected
+        self.startButtonPwarp.setDisabled(False)
+        self.imageFrame.releaseMouse()
+        self.imageFrame.mousePressEvent = None
+
+        if self.image_tuning_dewarp:
+            self.startButtonPwarp.setText("Click when done tuning")   ## Not updating TODO
+            self.startButtonPwarp.clicked.connect(self.stop_tuning)
 
         print(
             f"Check Widget UI Frame | W: {self.width()}, H: {self.height()}\n"

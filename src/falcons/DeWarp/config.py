@@ -54,19 +54,19 @@ class DeWarpConfig:
     # 1) read from config or
     # 2) inferred from `field_width` and `center_circle_radius` --- current setting
     # Landmark 1, where the middle circle meets the middle line
-    landmark1: Tuple[float, float] = dataclasses.field(init=False)
-    # Landmark 2, where the middle line meets the outer field line
-    landmark2: Tuple[float, float] = dataclasses.field(init=False)
-    # Landmark 3, from the center circle spot towards the goal, where the (fictive) line meets the center circle line
-    landmark3: Tuple[float, float] = dataclasses.field(init=False)
-    # Landmark 4, Penalty Spot
-    landmark4: Tuple[float, float] = dataclasses.field(init=False)
+    # landmark1: Tuple[float, float] = dataclasses.field(init=False)
+    # # Landmark 2, where the middle line meets the outer field line
+    # landmark2: Tuple[float, float] = dataclasses.field(init=False)
+    # # Landmark 3, from the center circle spot towards the goal, where the (fictive) line meets the center circle line
+    # landmark3: Tuple[float, float] = dataclasses.field(init=False)
+    # # Landmark 4, Penalty Spot
+    # landmark4: Tuple[float, float] = dataclasses.field(init=False)
 
     field_coordinates_center: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_lm1: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_lm2: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_lm3: Tuple[int, int] = dataclasses.field(init=False)
-    field_coordinates_lm4: Tuple[int, int] = dataclasses.field(init=False)
+    field_coordinates_lmks: Tuple[int, int] = dataclasses.field(init=False)
+    # field_coordinates_lm2: Tuple[int, int] = dataclasses.field(init=False)
+    # field_coordinates_lm3: Tuple[int, int] = dataclasses.field(init=False)
+    # field_coordinates_lm4: Tuple[int, int] = dataclasses.field(init=False)
 
     def __post_init__(self):
         self.field_length_total = self.field_length + 2 * self.safe_zone
@@ -82,28 +82,19 @@ class DeWarpConfig:
             [1000, 700]
         ])
 
-        self.landmark1 = (0, self.center_circle_radius)
-        self.landmark2 = (0, self.field_width / 2)
-        self.landmark3 = (self.center_circle_radius, 0)
-        self.landmark4 = (self.field_width / 2, 0)
+        self.landmarks = [
+            (0, self.center_circle_radius),
+            (0, self.field_width / 2),
+            (self.center_circle_radius, 0),
+            (self.field_width / 2, 0),
+        ]
 
-        # TODO Why are the x-y coordinates flipped wrt to the landmarks?
-        self.field_coordinates_lm1 = (
-            int((self.field_length_total / 2 - self.landmark1[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark1[1]) * self.ppm),
-        )
-        self.field_coordinates_lm2 = (
-            int((self.field_length_total / 2 - self.landmark2[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark2[1]) * self.ppm),
-        )
-        self.field_coordinates_lm3 = (
-            int((self.field_length_total / 2 - self.landmark3[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark3[1]) * self.ppm),
-        )
-        self.field_coordinates_lm4 = (
-            int((self.field_length_total / 2 - self.landmark4[0]) * self.ppm),
-            int((self.field_width_total / 2 - self.landmark4[1]) * self.ppm),
-        )
+        self.field_coordinates_lmks = []
+        for lmk in self.landmarks:
+            self.field_coordinates_lmks.append((
+                int((self.field_length_total / 2 - lmk[0]) * self.ppm),
+                int((self.field_width_total / 2 - lmk[1]) * self.ppm),
+            ))
 
 
 def get_config(path_to_config: Optional[str] = None) -> DeWarpConfig:
