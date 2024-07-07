@@ -46,12 +46,7 @@ class Warper(object):
         self.landmark_points = landmark_points  # Field Coordinate FCS
         config = get_config()
         self.landmark_points_field = np.array(
-            [
-                config.landmark1,
-                config.landmark2,
-                config.landmark3,
-                config.landmark4,
-            ]
+            config.landmarks
         )
         # self.dst = None
         # self.HvImage = None
