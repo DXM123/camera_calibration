@@ -2018,9 +2018,9 @@ class CameraWidget(QWidget):
                     if transformed_point:
                         print(f"Original point: ({x}, {y})")
                         print(f"Transformed point: {transformed_point}")
-                        print(f"angle: {np.arctan2(*transformed_point)-math.pi/4}")
-                        transformed_point_image = (np.array([*transformed_point, 1]) @ self.config.transposeRobotToImage)
-                        transformed_point_image = np.array(transformed_point_image)[0]
+                        print(f"angle: {transformed_point[2]}")
+                        print(f"elevation: {transformed_point[3]}")
+                        transformed_point_image = np.array(np.array([*transformed_point[:2], 1]) @ self.config.transposeRobotToImage)[0]
                         print(f"Transformed point image: {transformed_point_image}")
 
                         #Refine transformed point to support x, y
@@ -2349,7 +2349,7 @@ class CameraWidget(QWidget):
             
             # Assuming the LUT was saved as float32 for both x' and y' values
             dtype = np.float32
-            lut = np.frombuffer(file.read(), dtype=dtype).reshape((rows, cols, 2))
+            lut = np.frombuffer(file.read(), dtype=dtype).reshape((rows, cols, 4))
 
             print(f"LUT binary {filename} loaded")
 

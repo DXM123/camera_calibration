@@ -7,6 +7,7 @@ import numpy as np
 
 from .common import MarkerColors, SoccerFieldColors
 from .config import get_config
+import math
 
 class Warper(object):
     def __init__(
@@ -128,7 +129,7 @@ class Warper(object):
 
     def create_lookup_table(self, img_shape: Tuple[int, int]):
         height, width = img_shape
-        lut = np.zeros((height, width, 2), dtype=np.float32)
+        lut = np.zeros((height, width, 4), dtype=np.float32)
 
         # Create an array of all distorted points
         distorted_points = np.array([[x, y] for y in range(height) for x in range(width)], dtype=np.float32)
@@ -145,5 +146,10 @@ class Warper(object):
         transformed_points = transformed_points.reshape(-1, 2)
         lut[:, :, 0] = transformed_points[:, 0].reshape(height, width)
         lut[:, :, 1] = transformed_points[:, 1].reshape(height, width)
+        lut[:, :, 2] = np.arctan2(lut[:,:,0], lut[:,:,1])-math.pi/4
+        lut[:, :, 3] = 0
+        sizeOfField = 25
+        lut[:, :, 3][lut[:, :, 0]*lut[:, :, 1] > sizeOfField**2] = 1
+        lut[:, :, 3][np.maximum(lut[:, :, 0], lut[:, :, 1]) < 0] = 1
 
         return lut
