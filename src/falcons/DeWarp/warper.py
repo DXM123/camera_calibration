@@ -20,7 +20,9 @@ class Warper(object):
         new_matrix: np.ndarray = None,
         dist_coeff: np.ndarray = None,
         interpolation=None,
+        cameraID=0,
     ):
+        self.cameraID = cameraID
         self.config = get_config()
         self.D = dist_coeff
         self.K = matrix
@@ -43,11 +45,19 @@ class Warper(object):
         self.src_width = width
         self.src_height = height
         self.src_points = points
-        self.landmark_points = landmark_points  # Field Coordinate FCS
+
+        # Field Coordinate FCS
         config = get_config()
-        self.landmark_points_field = np.array(
-            config.landmarks
-        )
+        self.landmark_points = []
+        self.landmark_points_field = config.rotate90degPoints(config.landmarks, self.cameraID)
+
+        for p in self.landmark_points_field:
+            self.landmark_points.append(config.robotPoseToImagePose(p))
+
+        self.landmark_points_field = np.array(self.landmark_points_field)
+        self.landmark_points = np.array(self.landmark_points)
+
+
         # self.dst = None
         # self.HvImage = None
         self.HvRobot = None
@@ -86,6 +96,10 @@ class Warper(object):
         )
 
         self.plan_view = cv2.warpPerspective(src_img, self.HvImage, (dst_img.shape[1], dst_img.shape[0]))
+        # print("self.cameraID =", self.cameraID)
+        # for i in range(self.cameraID):
+        #     cv2.rotate(self.plan_view, cv2.ROTATE_90_COUNTERCLOCKWISE, self.plan_view)
+
 
         # Print the actual resulting image size after resizing or not
         print(f"Result after warp: width={self.plan_view.shape[1]}, height={self.plan_view.shape[0]}")
