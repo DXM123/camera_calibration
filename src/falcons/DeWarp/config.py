@@ -96,6 +96,24 @@ class DeWarpConfig:
                 int((self.field_width_total / 2 - lmk[1]) * self.ppm),
             ))
 
+    def robotPoseToImagePose(self, pose):
+        
+        return np.array(np.array([*pose, 1]) @ self.transposeRobotToImage)[0][:2]
+
+
+    def rotate90deg(self, point, angle, center=(0, 0)):
+        point = (point[0] - center[0], point[1] - center[1]) 
+        for i in range(angle):
+            point = (point[1], -point[0])
+        point = (point[0] + center[0], point[1] + center[1])
+        return point
+
+    # rotate landmarks by multitple of 90°
+    def rotate90degPoints(self, points, angle: int, center=(0, 0)):
+        new_points = []
+        for point in points:
+            new_points.append(self.rotate90deg(point, angle, center))
+        return new_points
 
 def get_config(path_to_config: Optional[str] = None) -> DeWarpConfig:
     """Takes a str to a `.yaml` or if `None` loads the default Falcon config."""

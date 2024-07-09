@@ -27,6 +27,8 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QComboBox,
+    QErrorMessage
 )
 
 from .common import MarkerColors, SoccerFieldColors
@@ -34,6 +36,7 @@ from .config import get_config
 from .soccer_field import SoccerField
 from .warper import Warper
 from .pylonThread import PylonThread
+from PyQt5.QtWidgets import QComboBox, QDialog, QVBoxLayout, QLabel, QPushButton
 
 # MainWidget
 class CameraWidget(QWidget):
@@ -1441,7 +1444,7 @@ class CameraWidget(QWidget):
 
         # Finally, remap the image using the undistortion map for the corrected image
         undistorted_frame = cv2.remap(frame, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT) # verify interpolation
-
+        
         return undistorted_frame
 
 
@@ -1683,32 +1686,86 @@ class CameraWidget(QWidget):
             # Start collecting arrow key events
             self.imageFrame.keyPressEvent = self.keypress_tuning_event
 
+        
+       
         # Starts a loop collecting points
-        while len(self.points) < len(self.config.field_coordinates_lmks):
-            point_Id = len(self.points)
-            print(self.points)
-            landMark_img = self.config.field_coordinates_lmks[point_Id]
-            landMark_robot = self.config.landmarks[point_Id]
-            self.processoutputWindow.setText(f"Select landmark number {point_Id} ({landMark_robot})")
-            self.field_image = self.draw_landmark(self.field_image, landMark_img, SoccerFieldColors.Red.value)
+        if len(self.points) < len(self.config.field_coordinates_lmks):
 
-            # Convert to Pixman
-            self.pixmap = self.imageToPixmap(self.field_image)
-            pixmap = QPixmap(self.pixmap)
+            # make a popup with a combo box 0, 1, 2, 3 to select the camera ID
+            class CameraIdPopup(QDialog):
+                def __init__(self):
+                    super().__init__()
+                    self.setWindowTitle("Select Camera ID")
+                    layout = QVBoxLayout()
+                    label = QLabel("Select Camera ID:")
+                    self.combo_box = QComboBox()
+                    self.combo_box.addItems(["0", "1", "2", "3"])
+                    layout.addWidget(label)
+                    layout.addWidget(self.combo_box)
+                    button = QPushButton("OK")
+                    button.clicked.connect(self.accept)
+                    layout.addWidget(button)
+                    self.setLayout(layout)
 
-            # Load the Field image
-            self.ProcessImage.setPixmap(pixmap)
-            self.ProcessImage.setScaledContents(True)
+                def get_selected_camera_id(self):
+                    if self.exec_() == QDialog.Accepted:
+                        return int(self.combo_box.currentText())
+                    else:
+                        return None
+
+            # Inside the dewarp() method
+            while True:
+                popup = CameraIdPopup()
+                try:
+                    self.camera_id = popup.get_selected_camera_id()
+                    if self.camera_id is not None:
+                        break
+                except ValueError as e:
+                    print(f"Error: {e}")
+                    error_dialog = QErrorMessage()
+                    error_dialog.showMessage('Please select a camera ID')
+                    
+            
+            fieldImgCenter = np.array([self.field_image.shape[1]/2, self.field_image.shape[0]/2])
+            direction = fieldImgCenter*-1
+            for x in range(self.camera_id):
+                direction = np.array([direction[1], -direction[0]])
+            target = fieldImgCenter+direction/5
+
+            cv2.line(self.field_image, (int(fieldImgCenter[0]), int(fieldImgCenter[1])), (int(target[0]), int(target[1])), (255, 0, 0), 4) 
 
 
-            if self.verify_lut_started:
-                # DOnt need keyboard input here
-                self.imageFrame.releaseKeyboard()
-                self.imageFrame.keyPressEvent = None
-                print("Enabeling mouse input on image Frame")
-                self.imageFrame.mousePressEvent = self.mouse_click_landmark_event # Not working?
+            while len(self.points) < len(self.config.field_coordinates_lmks):
+                point_Id = len(self.points)
+                print(self.points)
 
-            QApplication.processEvents()
+
+                landMark_img = self.config.rotate90degPoints(self.config.field_coordinates_lmks, self.camera_id, (fieldImgCenter[0], fieldImgCenter[1]))[point_Id]
+                landMark_img = (int(landMark_img[0]), int(landMark_img[1]))
+                landMark_robot = self.config.rotate90degPoints(self.config.landmarks, self.camera_id)[point_Id]
+                landMark_robot = (int(landMark_robot[0]), int(landMark_robot[1]))
+
+                
+                self.processoutputWindow.setText(f"Select landmark number {point_Id} ({landMark_robot})")
+                self.field_image = self.draw_landmark(self.field_image, landMark_img, SoccerFieldColors.Red.value)
+
+                # Convert to Pixman
+                self.pixmap = self.imageToPixmap(self.field_image)
+                pixmap = QPixmap(self.pixmap)
+
+                # Load the Field image
+                self.ProcessImage.setPixmap(pixmap)
+                self.ProcessImage.setScaledContents(True)
+
+
+                if self.verify_lut_started:
+                    # DOnt need keyboard input here
+                    self.imageFrame.releaseKeyboard()
+                    self.imageFrame.keyPressEvent = None
+                    print("Enabeling mouse input on image Frame")
+                    self.imageFrame.mousePressEvent = self.mouse_click_landmark_event # Not working?
+
+                QApplication.processEvents()
 
         # Enable Start button again when all points are collected
         self.startButtonPwarp.setDisabled(False)
@@ -1738,6 +1795,7 @@ class CameraWidget(QWidget):
             matrix=self.camera_matrix,
             new_matrix=self.new_K,
             dist_coeff=self.camera_dist_coeff,
+            cameraID=self.camera_id,
         )            
 
         return self.warper 
@@ -1854,6 +1912,8 @@ class CameraWidget(QWidget):
 
     def draw_landmark_selected(self, image, landmark, color):
         # Convert landmark to a tuple of integers
+        fieldImgCenter = np.array([self.field_image.shape[1]/2, self.field_image.shape[0]/2])
+        landmark = self.config.rotate90deg((landmark[0], landmark[1]), self.camera_id, (fieldImgCenter[0], fieldImgCenter[1]))
         landmark = (int(landmark[0]), int(landmark[1]))
 
         # Draw the landmark selector
