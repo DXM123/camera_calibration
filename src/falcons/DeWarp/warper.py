@@ -145,6 +145,6 @@ class Warper(object):
         lut[:, :, 3] = 0
         sizeOfField = 25
         lut[:, :, 3][lut[:, :, 0]*lut[:, :, 1] > sizeOfField**2] = 1
-        lut[:, :, 3][np.maximum(lut[:, :, 0], lut[:, :, 1]) < 0] = 1
+        lut[:, :, 3][(lut[:, :, 0] + lut[:, :, 1]) < 0] = 1
 
         return lut
