@@ -33,4 +33,56 @@ mv camera-0.cameramodel ./test/R13-cam0-splined.cameramodel
 
 #Debug commands
 
+#Plot corners detected
+< ./test/R13-cam0-corners.vnl \
+vnl-filter -p x,y | \
+feedgnuplot --domain --square --set 'xrange [0:800] noextend' --set 'yrange [608:0] noextend'
+
+#Undistort Images
+mrcal-reproject-image --to-pinhole      \
+   ./test/R13-cam0-opencv8.cameramodel  \
+   ./test/test_calibration/R13/cam0/*.jpg
+
+##### Look at how the solver thinks about the geometry
+mrcal-show-geometry      \
+  ./test/R13-cam0-opencv8.cameramodel            \
+  --show-calobjects      \
+  --unset key            \
+  --set 'xyplane 0'      \
+  --set 'view 80,30,1.5'
+
+## Distribution of errors 
+
+ mrcal-show-residuals    \
+  --histogram           \
+  --set 'xrange [-2:2]' \
+  --unset key           \
+  --binwidth 0.1        \
+  ./test/R13-cam0-opencv8.cameramodel
+
+
+  #Look at worst image
+  mrcal-show-residuals-board-observation \
+  --from-worst                         \
+  --vectorscale 200                    \
+  --circlescale 0.5                    \
+  --set 'cbrange [0:2]'                \
+  ./test/R13-cam0-opencv8.cameramodel                 \
+  0
+
+### Show residuals together --> good view as debug!!!
+mrcal-show-residuals                   \
+  --magnitudes                         \
+  --set 'cbrange [0:1.5]'              \
+  ./test/R13-cam0-opencv8.cameramodel
+  
+## let's look at all the residuals over all the observations, color-coded by their direction, ignoring the magnitudes:
+mrcal-show-residuals    \
+  --directions          \
+  --unset key           \
+  ./test/R13-cam0-opencv8.cameramodel
+
+
+#======== advanced using splined stereographic model
+
 
