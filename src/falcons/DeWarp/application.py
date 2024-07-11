@@ -4,15 +4,18 @@ import sys
 import numpy as np
 #import tempfile
 
-from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow, QMessageBox, QStatusBar
+from PyQt5.QtWidgets import QAction, QFileDialog, QMainWindow, QMessageBox, QStatusBar, QTabWidget
 
-from .widget import CameraWidget
+# from .widget import CameraWidget
 from .config import get_config
 from .videoinput import VideoInput
 
+from .cameraCalibration import WidgetCameraCalibration
+from .perspectiveWarp import WidgetPerspectiveWarp
 
 class CamCalMain(QMainWindow):
-    def __init__(self, video):
+    def __init__(self, args):
+        video = args.input
         super().__init__()
         self.title = "Falcons Calibration GUI - BETA"
         self.setWindowTitle(self.title)
@@ -39,8 +42,23 @@ class CamCalMain(QMainWindow):
 
     def init_ui(self):
         # Create the central widget
-        self.camera_widget = CameraWidget(self, self.video_input)
-        self.setCentralWidget(self.camera_widget)
+        # self.camera_widget = CameraWidget(self, self.video_input)
+        self.setGeometry(0, 0, 800, 600)
+
+
+        # Initialize tab screen
+        self.tabs = QTabWidget()
+
+        self.tabCameraCalibration = WidgetCameraCalibration(self)
+        self.tabPerspectiveWarp = WidgetPerspectiveWarp(self)
+
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.tabCameraCalibration, "Camera Calibration")
+        self.tabs.addTab(self.tabPerspectiveWarp, "Perspective-Warp")
+
+        self.setCentralWidget(self.tabs)
+
 
         # Create the menu bar
         menubar = self.menuBar()
@@ -66,7 +84,7 @@ class CamCalMain(QMainWindow):
         statusbar.showMessage("Status: Not started")
 
         # Connect the signal to the slot for updating the status bar
-        self.camera_widget.update_status_signal.connect(self.update_status_bar)
+        # self.camera_widget.update_status_signal.connect(self.update_status_bar)
 
     def load_lut(self, filename):
         options = QFileDialog.Options()

@@ -10,7 +10,7 @@ __version__ = '0.0.4' # TODO: this looks unused/strange, can we remove it?
 
 def run(args):
     app = QApplication([])
-    ex = CamCalMain(args.input)
+    ex = CamCalMain(args)
     # configure based on given arguments (typically coming from argparse)
     #if not os.path.isdir(args.folder):
     #    raise Exception(f'calibration folder not found: {args.folder}')
