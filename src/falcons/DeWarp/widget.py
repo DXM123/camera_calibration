@@ -1668,6 +1668,43 @@ class CameraWidget(QWidget):
                 self, "Warning!", f"No Image detected.\n\nPlease make sure an Image is loaded", QMessageBox.Ok
             )
             
+
+    def askCameraId(self):
+        # make a popup with a combo box 0, 1, 2, 3 to select the camera ID
+        class CameraIdPopup(QDialog):
+            def __init__(self):
+                super().__init__()
+                self.setWindowTitle("Select Camera ID")
+                layout = QVBoxLayout()
+                label = QLabel("Select Camera ID:")
+                self.combo_box = QComboBox()
+                self.combo_box.addItems(["0", "1", "2", "3"])
+                layout.addWidget(label)
+                layout.addWidget(self.combo_box)
+                button = QPushButton("OK")
+                button.clicked.connect(self.accept)
+                layout.addWidget(button)
+                self.setLayout(layout)
+
+            def get_selected_camera_id(self):
+                if self.exec_() == QDialog.Accepted:
+                    return int(self.combo_box.currentText())
+                else:
+                    return None
+
+        # Inside the dewarp() method
+        while True:
+            popup = CameraIdPopup()
+            try:
+                self.camera_id = popup.get_selected_camera_id()
+                if self.camera_id is not None:
+                    break
+            except ValueError as e:
+                print(f"Error: {e}")
+                error_dialog = QErrorMessage()
+                error_dialog.showMessage('Please select a camera ID')
+
+
     def dewarp(self, img):
         # Add check if Tuning is started TODO
         bgimage = img.copy()
@@ -1690,40 +1727,8 @@ class CameraWidget(QWidget):
        
         # Starts a loop collecting points
         if len(self.points) < len(self.config.field_coordinates_lmks):
-
-            # make a popup with a combo box 0, 1, 2, 3 to select the camera ID
-            class CameraIdPopup(QDialog):
-                def __init__(self):
-                    super().__init__()
-                    self.setWindowTitle("Select Camera ID")
-                    layout = QVBoxLayout()
-                    label = QLabel("Select Camera ID:")
-                    self.combo_box = QComboBox()
-                    self.combo_box.addItems(["0", "1", "2", "3"])
-                    layout.addWidget(label)
-                    layout.addWidget(self.combo_box)
-                    button = QPushButton("OK")
-                    button.clicked.connect(self.accept)
-                    layout.addWidget(button)
-                    self.setLayout(layout)
-
-                def get_selected_camera_id(self):
-                    if self.exec_() == QDialog.Accepted:
-                        return int(self.combo_box.currentText())
-                    else:
-                        return None
-
-            # Inside the dewarp() method
-            while True:
-                popup = CameraIdPopup()
-                try:
-                    self.camera_id = popup.get_selected_camera_id()
-                    if self.camera_id is not None:
-                        break
-                except ValueError as e:
-                    print(f"Error: {e}")
-                    error_dialog = QErrorMessage()
-                    error_dialog.showMessage('Please select a camera ID')
+            
+            self.askCameraId()
                     
             
             fieldImgCenter = np.array([self.field_image.shape[1]/2, self.field_image.shape[0]/2])
@@ -1910,11 +1915,13 @@ class CameraWidget(QWidget):
 
         return image
 
-    def draw_landmark_selected(self, image, landmark, color):
+    def draw_landmark_selected(self, image, landmark, color, autoRotate=True):
         # Convert landmark to a tuple of integers
-        fieldImgCenter = np.array([self.field_image.shape[1]/2, self.field_image.shape[0]/2])
-        landmark = self.config.rotate90deg((landmark[0], landmark[1]), self.camera_id, (fieldImgCenter[0], fieldImgCenter[1]))
-        landmark = (int(landmark[0]), int(landmark[1]))
+
+        if autoRotate:
+            fieldImgCenter = np.array([self.field_image.shape[1]/2, self.field_image.shape[0]/2])
+            landmark = self.config.rotate90deg((landmark[0], landmark[1]), self.camera_id, (fieldImgCenter[0], fieldImgCenter[1]))
+            landmark = (int(landmark[0]), int(landmark[1]))
 
         # Draw the landmark selector
         cv2.circle(image, landmark, 30, (color), 5)
@@ -2026,7 +2033,7 @@ class CameraWidget(QWidget):
 
                         # Using rounded values
                         self.field_image_selected = self.draw_landmark_selected(
-                            self.field_image.copy(), rounded_transformed_point_image, MarkerColors.Yellow.value
+                            self.field_image.copy(), rounded_transformed_point_image, MarkerColors.Yellow.value, autoRotate=False
                         )
 
                         # Convert to Pixman
@@ -2282,7 +2289,7 @@ class CameraWidget(QWidget):
     
     def save_prep_mat_binary(self):
         # Set Filename static for now TODO add date and get from config
-        filename = "mat.bin"
+        filename = f"mat_camera_{self.camera_id}.bin"
         self.lut_filename = filename
 
         # Get Shape of dewarped image

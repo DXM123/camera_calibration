@@ -158,7 +158,8 @@ class Warper(object):
         lut[:, :, 2] = np.arctan2(lut[:,:,0], lut[:,:,1])-math.pi/4
         lut[:, :, 3] = 0
         sizeOfField = 25
-        lut[:, :, 3][lut[:, :, 0]*lut[:, :, 1] > sizeOfField**2] = 1
-        lut[:, :, 3][(lut[:, :, 0] + lut[:, :, 1]) < 0] = 1
+        lut[:, :, 3][np.abs(lut[:, :, 0]*lut[:, :, 1]) > sizeOfField**2] = 1
+        p = self.config.rotate90deg((1, 1), self.cameraID)
+        lut[:, :, 3][(lut[:, :, 0]*p[0] + lut[:, :, 1]*p[1]) < 0] = 1
 
         return lut

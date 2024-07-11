@@ -69,6 +69,8 @@ class CamCalMain(QMainWindow):
         self.camera_widget.update_status_signal.connect(self.update_status_bar)
 
     def load_lut(self, filename):
+        self.camera_widget.askCameraId()
+
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
 
